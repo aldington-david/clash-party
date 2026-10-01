@@ -1,3 +1,14 @@
+<!-- anytls-reality-fork -->
+# AnyTLS + REALITY 自有构建
+
+使用自有 AnyTLS + REALITY 核心，仅发布六种指定桌面安装包。 这是 `aldington-david` 维护的独立版本，非上游官方发行版。
+
+[下载 Releases](https://github.com/aldington-david/clash-party/releases) · [自动构建状态](https://github.com/aldington-david/clash-party/actions) · [构建、签名与复跑说明](.anytls/README.md)
+
+默认 `anytls-reality` 分支维护自动化；每个 Release 标签保存对应上游正式版本的定制源码和准确核心版本。下方保留上游说明，其中上游下载入口不会提供本仓库的定制构建。
+
+---
+
 <h3 align="center">
   <img height='48px' src='./images/icon-white.png#gh-dark-mode-only'>
   <img height='48px' src='./images/icon-black.png#gh-light-mode-only'>
