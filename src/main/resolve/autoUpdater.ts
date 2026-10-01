@@ -31,6 +31,7 @@ interface GitHubReleaseAsset {
 }
 
 interface GitHubRelease {
+  tag_name: string
   assets?: GitHubReleaseAsset[]
 }
 
@@ -71,13 +72,13 @@ function updaterProxy(mixedPort: number): UpdaterProxy {
 }
 
 async function getGitHubAssetSha256(
-  version: string,
+  tag: string,
   file: string,
   proxy: UpdaterProxy
 ): Promise<string> {
-  const releaseTag = encodeURIComponent(`v${version}`)
+  const releaseTag = encodeURIComponent(tag)
   const res = await chromeRequest.get<GitHubRelease>(
-    `https://api.github.com/repos/mihomo-party-org/mihomo-party/releases/tags/${releaseTag}`,
+    `https://api.github.com/repos/aldington-david/clash-party/releases/tags/${releaseTag}`,
     {
       headers: {
         Accept: 'application/vnd.github+json',
@@ -100,7 +101,7 @@ export async function checkUpdate(): Promise<IAppVersion | undefined> {
   const [{ 'mixed-port': mixedPort = DEFAULT_MIHOMO_PORTS.mixed }, { githubProxy = '' }] =
     await Promise.all([getControledMihomoConfig(), getAppConfig()])
   const githubUrl =
-    'https://github.com/mihomo-party-org/mihomo-party/releases/latest/download/latest.yml'
+    'https://github.com/aldington-david/clash-party/releases/latest/download/latest.yml'
   const res = await tryDownload(buildDownloadUrls(githubUrl, githubProxy), {
     headers: { 'Content-Type': 'application/octet-stream' },
     proxy: updaterProxy(mixedPort),
@@ -150,7 +151,13 @@ export function downloadAndInstallUpdate(version: string): Promise<void> {
 async function installUpdate(version: string): Promise<void> {
   const [{ 'mixed-port': mixedPort = DEFAULT_MIHOMO_PORTS.mixed }, { githubProxy = '' }] =
     await Promise.all([getControledMihomoConfig(), getAppConfig()])
-  const githubBase = `https://github.com/mihomo-party-org/mihomo-party/releases/download/v${version}/`
+  const release = await chromeRequest.get<GitHubRelease>(
+    'https://api.github.com/repos/aldington-david/clash-party/releases/latest',
+    { responseType: 'json', timeout: 10000 }
+  )
+  const tag = release.data.tag_name
+  if (!tag?.startsWith(`v${version}-anytls-`)) throw new Error('The requested fork release is no longer latest; check for updates again')
+  const githubBase = `https://github.com/aldington-david/clash-party/releases/download/${encodeURIComponent(tag)}/`
   const fileMap = {
     'win32-x64': `clash-party-windows-${version}-x64-setup.exe`,
     'win32-ia32': `clash-party-windows-${version}-ia32-setup.exe`,
@@ -181,7 +188,7 @@ async function installUpdate(version: string): Promise<void> {
     if (!existsSync(path.join(dataDir(), file))) {
       let expectedHash: string
       try {
-        expectedHash = await getGitHubAssetSha256(version, file, proxy)
+        expectedHash = await getGitHubAssetSha256(tag, file, proxy)
       } catch (e) {
         await appLogger.warn(
           'Failed to get update SHA-256 from GitHub API, falling back to release checksum file',

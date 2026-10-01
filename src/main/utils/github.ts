@@ -171,6 +171,7 @@ export async function downloadGitHubAsset(url: string, outputPath: string): Prom
  */
 export async function installMihomoCore(version: string): Promise<void> {
   try {
+    if (!/^v\d+\.\d+\.\d+$/.test(version)) throw new Error('Invalid stable core version')
     log.info(`Installing mihomo core version ${version}`)
 
     const plat = platform()
@@ -178,20 +179,19 @@ export async function installMihomoCore(version: string): Promise<void> {
 
     // 映射平台和架构到 GitHub Release 文件名
     const key = `${plat}-${arch}`
-    const name = PLATFORM_MAP[key]
+    const name = PLATFORM_MAP[key] + (plat === 'win32' && __LEGACY_BUILD__ ? '-go120' : '')
 
-    if (!name) {
+    if (!PLATFORM_MAP[key]) {
       throw new Error(`Unsupported platform "${plat}-${arch}"`)
     }
 
     const isWin = plat === 'win32'
     const urlExt = isWin ? 'zip' : 'gz'
-    const downloadURL = `https://github.com/MetaCubeX/mihomo/releases/download/${version}/${name}-${version}.${urlExt}`
+    const downloadURL = `https://github.com/aldington-david/mihomo/releases/download/${version}/${name}-${version}.${urlExt}`
 
     const coreDir = mihomoCoreDir()
     const tempZip = join(coreDir, `temp-core.${urlExt}`)
-    const exeFile = `${name}${isWin ? '.exe' : ''}`
-    const targetFile = `mihomo-specific${isWin ? '.exe' : ''}`
+    const targetFile = `mihomo-anytls-specific${isWin ? '.exe' : ''}`
     const targetPath = join(coreDir, targetFile)
 
     // 如果目标文件已存在，先停止核心
@@ -209,13 +209,14 @@ export async function installMihomoCore(version: string): Promise<void> {
       log.debug(`Extracting ZIP file ${tempZip}`)
       const zip = new AdmZip(tempZip)
       const entries = zip.getEntries()
-      const entry = entries.find((e) => e.entryName.includes(exeFile))
+      const binaries = entries.filter((e) => !e.isDirectory && /^mihomo[^/\\]*\.exe$/.test(e.entryName))
+      const entry = binaries.length === 1 ? binaries[0] : undefined
 
       if (entry) {
         zip.extractEntryTo(entry, coreDir, false, true, false, targetFile)
-        log.debug(`Successfully extracted ${exeFile} to ${targetPath}`)
+        log.debug(`Successfully extracted ${entry.entryName} to ${targetPath}`)
       } else {
-        throw new Error(`Executable file not found in zip: ${exeFile}`)
+        throw new Error('Core ZIP must contain exactly one mihomo executable')
       }
     } else {
       // 处理.gz 文件

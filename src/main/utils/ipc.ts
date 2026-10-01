@@ -183,16 +183,16 @@ function registerHandlers(handlers: Record<string, AsyncFn | SyncFn>, async = tr
 async function fetchMihomoTags(
   forceRefresh = false
 ): Promise<{ name: string; zipball_url: string; tarball_url: string }[]> {
-  return await getGitHubTags('MetaCubeX', 'mihomo', forceRefresh)
+  return await getGitHubTags('aldington-david', 'mihomo', forceRefresh)
 }
 
 async function installSpecificMihomoCore(version: string): Promise<void> {
-  clearVersionCache('MetaCubeX', 'mihomo')
+  clearVersionCache('aldington-david', 'mihomo')
   return await installMihomoCore(version)
 }
 
 async function clearMihomoVersionCache(): Promise<void> {
-  clearVersionCache('MetaCubeX', 'mihomo')
+  clearVersionCache('aldington-david', 'mihomo')
 }
 
 async function getRuleStr(id: string): Promise<string> {
