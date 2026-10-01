@@ -1,0 +1,819 @@
+diff --git a/.gitignore b/.gitignore
+index 78f4cc6..3e2ad4b 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -12,3 +12,10 @@ party.md
+ CLAUDE.md
+ agent.md
+ tsconfig.node.tsbuildinfo
++.cache/
++build-source/
++release-assets/
++core-build-info.json
++release-notes.md
++__pycache__/
++.localpycache/
+diff --git a/electron-builder.yml b/electron-builder.yml
+index 69a05cd..2ed79e8 100644
+--- a/electron-builder.yml
++++ b/electron-builder.yml
+@@ -9,6 +9,9 @@ files:
+   - '!images/*'
+   - '!scripts/*'
+   - '!extra/*'
++  - '!.anytls/*'
++  - '!.anytls-build.json'
++  - '!core-build-info.json'
+   - '!tailwind.config.js'
+   - '!postcss.config.js'
+   - '!electron.vite.config.{js,ts,mjs,cjs}'
+@@ -34,7 +37,6 @@ fileAssociations:
+ win:
+   target:
+     - nsis
+-    - 7z
+   artifactName: clash-party-windows-${version}-${arch}-portable.${ext}
+ nsis:
+   artifactName: clash-party-windows-${version}-${arch}-setup.${ext}
+@@ -50,7 +52,8 @@ mac:
+     - from: './build/pkg-scripts/party.mihomo.helper.plist'
+       to: 'files/party.mihomo.helper.plist'
+   entitlementsInherit: build/entitlements.mac.plist
+-  hardenedRuntime: true
++  identity: '-'
++  hardenedRuntime: false
+   gatekeeperAssess: false
+   extendInfo:
+     - NSCameraUsageDescription: Application requests access to the device's camera.
+@@ -80,8 +83,6 @@ linux:
+       Icon: mihomo-party
+   target:
+     - deb
+-    - rpm
+-    - pacman
+   maintainer: mihomo-party-org
+   category: Utility
+   artifactName: clash-party-linux-${version}-${arch}.${ext}
+diff --git a/scripts/prepare.mjs b/scripts/prepare.mjs
+index 0cfb6bb..d037c93 100644
+--- a/scripts/prepare.mjs
++++ b/scripts/prepare.mjs
+@@ -1,4 +1,5 @@
+ import fs from 'fs'
++import { createHash } from 'crypto'
+ import AdmZip from 'adm-zip'
+ import path from 'path'
+ import zlib from 'zlib'
+@@ -26,171 +27,36 @@ function resolveTargetArch() {
+ }
+ const arch = resolveTargetArch()
+ 
+-/* ======= mihomo alpha======= */
+-const MIHOMO_ALPHA_VERSION_URL =
+-  'https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt'
+-const MIHOMO_ALPHA_URL_PREFIX = `https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha`
+-let MIHOMO_ALPHA_VERSION
+-
+-const MIHOMO_ALPHA_MAP = {
+-  'win32-x64': 'mihomo-windows-amd64-compatible',
+-  'win32-ia32': 'mihomo-windows-386',
+-  'win32-arm64': 'mihomo-windows-arm64',
+-  'darwin-x64': 'mihomo-darwin-amd64-compatible',
+-  'darwin-arm64': 'mihomo-darwin-arm64',
+-  'linux-x64': 'mihomo-linux-amd64-compatible',
+-  'linux-arm64': 'mihomo-linux-arm64'
+-}
+-
+-// Fetch the latest alpha release version from the version.txt file
+-async function getLatestAlphaVersion() {
+-  try {
+-    const response = await fetch(MIHOMO_ALPHA_VERSION_URL, {
+-      method: 'GET'
+-    })
+-    let v = await response.text()
+-    MIHOMO_ALPHA_VERSION = v.trim() // Trim to remove extra whitespaces
+-    console.log(`Latest alpha version: ${MIHOMO_ALPHA_VERSION}`)
+-  } catch (error) {
+-    console.error('Error fetching latest alpha version:', error.message)
+-    process.exit(1)
+-  }
+-}
+-
+-/* ======= mihomo smart ======= */
+-const MIHOMO_SMART_VERSION_URL =
+-  'https://github.com/vernesong/mihomo/releases/download/Prerelease-Alpha/version.txt'
+-const MIHOMO_SMART_URL_PREFIX = `https://github.com/vernesong/mihomo/releases/download/Prerelease-Alpha`
+-let MIHOMO_SMART_VERSION
+-
+-const MIHOMO_SMART_MAP = {
+-  'win32-x64': 'mihomo-windows-amd64-v2-go120',
+-  'win32-ia32': 'mihomo-windows-386-go120',
+-  'win32-arm64': 'mihomo-windows-arm64',
+-  'darwin-x64': 'mihomo-darwin-amd64-v2-go120',
+-  'darwin-arm64': 'mihomo-darwin-arm64',
+-  'linux-x64': 'mihomo-linux-amd64-v2-go120',
+-  'linux-arm64': 'mihomo-linux-arm64'
+-}
+-
+-async function getLatestSmartVersion() {
+-  try {
+-    const response = await fetch(MIHOMO_SMART_VERSION_URL, {
+-      method: 'GET'
+-    })
+-    let v = await response.text()
+-    MIHOMO_SMART_VERSION = v.trim() // Trim to remove extra whitespaces
+-    console.log(`Latest smart version: ${MIHOMO_SMART_VERSION}`)
+-  } catch (error) {
+-    console.error('Error fetching latest smart version:', error.message)
+-    process.exit(1)
+-  }
+-}
+-
+-/* ======= mihomo release ======= */
+-const MIHOMO_VERSION_URL =
+-  'https://github.com/MetaCubeX/mihomo/releases/latest/download/version.txt'
+-const MIHOMO_URL_PREFIX = `https://github.com/MetaCubeX/mihomo/releases/download`
+-let MIHOMO_VERSION
+-
++/* This fork bundles only the pinned AnyTLS + REALITY stable core. */
++const { core_tag: MIHOMO_VERSION } = JSON.parse(fs.readFileSync('.anytls-build.json', 'utf8'))
++if (!/^v\d+\.\d+\.\d+$/.test(MIHOMO_VERSION)) throw new Error('Invalid pinned core tag')
++const MIHOMO_URL_PREFIX = 'https://github.com/aldington-david/mihomo/releases/download'
+ const MIHOMO_MAP = {
+   'win32-x64': 'mihomo-windows-amd64-compatible',
+-  'win32-ia32': 'mihomo-windows-386',
+-  'win32-arm64': 'mihomo-windows-arm64',
+   'darwin-x64': 'mihomo-darwin-amd64-compatible',
+   'darwin-arm64': 'mihomo-darwin-arm64',
+   'linux-x64': 'mihomo-linux-amd64-compatible',
+   'linux-arm64': 'mihomo-linux-arm64'
+ }
+-
+-// Fetch the latest release version from the version.txt file
+-async function getLatestReleaseVersion() {
+-  try {
+-    const response = await fetch(MIHOMO_VERSION_URL, {
+-      method: 'GET'
+-    })
+-    let v = await response.text()
+-    MIHOMO_VERSION = v.trim() // Trim to remove extra whitespaces
+-    console.log(`Latest release version: ${MIHOMO_VERSION}`)
+-  } catch (error) {
+-    console.error('Error fetching latest release version:', error.message)
+-    process.exit(1)
+-  }
+-}
+-
+-/*
+- * check available
+- */
+-if (!MIHOMO_MAP[`${platform}-${arch}`]) {
+-  throw new Error(`unsupported platform "${platform}-${arch}"`)
+-}
+-
+-if (!MIHOMO_ALPHA_MAP[`${platform}-${arch}`]) {
+-  throw new Error(`unsupported platform "${platform}-${arch}"`)
+-}
+-
+-if (!MIHOMO_SMART_MAP[`${platform}-${arch}`]) {
+-  throw new Error(`unsupported platform "${platform}-${arch}"`)
+-}
+-
+-/**
+- * core info
+- */
+-function MihomoAlpha() {
+-  const name = MIHOMO_ALPHA_MAP[`${platform}-${arch}`]
+-  const isWin = platform === 'win32'
+-  const urlExt = isWin ? 'zip' : 'gz'
+-  const downloadURL = `${MIHOMO_ALPHA_URL_PREFIX}/${name}-${MIHOMO_ALPHA_VERSION}.${urlExt}`
+-  const exeFile = `${name}${isWin ? '.exe' : ''}`
+-  const zipFile = `${name}-${MIHOMO_ALPHA_VERSION}.${urlExt}`
+-
+-  return {
+-    name: 'mihomo-alpha',
+-    targetFile: `mihomo-alpha${isWin ? '.exe' : ''}`,
+-    exeFile,
+-    zipFile,
+-    downloadURL
+-  }
+-}
+-
+ function mihomo() {
+-  const name = MIHOMO_MAP[`${platform}-${arch}`]
++  let name = MIHOMO_MAP[`${platform}-${arch}`]
++  if (!name) throw new Error(`unsupported platform "${platform}-${arch}"`)
++  if (platform === 'win32' && process.env.LEGACY_BUILD === 'true') name += '-go120'
+   const isWin = platform === 'win32'
+-  const urlExt = isWin ? 'zip' : 'gz'
+-  const downloadURL = `${MIHOMO_URL_PREFIX}/${MIHOMO_VERSION}/${name}-${MIHOMO_VERSION}.${urlExt}`
+-  const exeFile = `${name}${isWin ? '.exe' : ''}`
+-  const zipFile = `${name}-${MIHOMO_VERSION}.${urlExt}`
+-
++  const zipFile = `${name}-${MIHOMO_VERSION}.${isWin ? 'zip' : 'gz'}`
+   return {
+     name: 'mihomo',
+     targetFile: `mihomo${isWin ? '.exe' : ''}`,
+-    exeFile,
++    exeFile: `${name}${isWin ? '.exe' : ''}`,
+     zipFile,
+-    downloadURL
+-  }
+-}
+-
+-function mihomoSmart() {
+-  const name = MIHOMO_SMART_MAP[`${platform}-${arch}`]
+-  const isWin = platform === 'win32'
+-  const urlExt = isWin ? 'zip' : 'gz'
+-  const downloadURL = `${MIHOMO_SMART_URL_PREFIX}/${name}-${MIHOMO_SMART_VERSION}.${urlExt}`
+-  const exeFile = `${name}${isWin ? '.exe' : ''}`
+-  const zipFile = `${name}-${MIHOMO_SMART_VERSION}.${urlExt}`
+-
+-  return {
+-    name: 'mihomo-smart',
+-    targetFile: `mihomo-smart${isWin ? '.exe' : ''}`,
+-    exeFile,
+-    zipFile,
+-    downloadURL
++    downloadURL: `${MIHOMO_URL_PREFIX}/${MIHOMO_VERSION}/${zipFile}`
+   }
+ }
+ /**
+  * download sidecar and rename
+  */
+ async function resolveSidecar(binInfo) {
+-  const { name, targetFile, zipFile, exeFile, downloadURL } = binInfo
++  const { name, targetFile, zipFile, downloadURL } = binInfo
+ 
+   const sidecarDir = path.join(cwd, 'extra', 'sidecar')
+   const sidecarPath = path.join(sidecarDir, targetFile)
+@@ -201,7 +67,6 @@ async function resolveSidecar(binInfo) {
+   }
+   const tempDir = path.join(TEMP_DIR, name)
+   const tempZip = path.join(tempDir, zipFile)
+-  const tempExe = path.join(tempDir, exeFile)
+ 
+   fs.mkdirSync(tempDir, { recursive: true })
+   try {
+@@ -209,13 +74,22 @@ async function resolveSidecar(binInfo) {
+       await downloadFile(downloadURL, tempZip)
+     }
+ 
++    const checksums = await fetch(`${MIHOMO_URL_PREFIX}/${MIHOMO_VERSION}/sha256sum.txt`)
++    if (!checksums.ok) throw new Error(`Cannot fetch core checksums: ${checksums.status}`)
++    const expected = (await checksums.text()).split('\n')
++      .map((line) => line.trim().split(/\s+/))
++      .find((fields) => fields[1]?.replace(/^\*/, '') === zipFile)?.[0]
++    const actual = createHash('sha256').update(fs.readFileSync(tempZip)).digest('hex')
++    if (!expected || actual !== expected.toLowerCase()) throw new Error('Core checksum mismatch')
++    fs.writeFileSync('core-build-info.json', JSON.stringify({
++      repository: 'aldington-david/mihomo', tag: MIHOMO_VERSION, asset: zipFile, sha256: actual
++    }, null, 2))
++
+     if (zipFile.endsWith('.zip')) {
+       const zip = new AdmZip(tempZip)
+-      zip.getEntries().forEach((entry) => {
+-        console.log(`[DEBUG]: "${name}" entry name`, entry.entryName)
+-      })
+-      zip.extractAllTo(tempDir, true)
+-      fs.renameSync(tempExe, sidecarPath)
++      const entries = zip.getEntries().filter((entry) => !entry.isDirectory && /^mihomo[^/\\]*\.exe$/.test(entry.entryName))
++      if (entries.length !== 1) throw new Error('Core ZIP must contain exactly one mihomo executable')
++      fs.writeFileSync(sidecarPath, entries[0].getData())
+       console.log(`[INFO]: "${name}" unzip finished`)
+     } else if (zipFile.endsWith('.tgz')) {
+       // tgz
+@@ -259,7 +133,7 @@ async function resolveSidecar(binInfo) {
+     }
+   } catch (err) {
+     // 需要删除文件
+-    fs.rmSync(sidecarPath)
++    fs.rmSync(sidecarPath, { force: true })
+     throw err
+   } finally {
+     fs.rmSync(tempDir, { recursive: true })
+@@ -508,21 +382,7 @@ const resolveFont = async () => {
+ }
+ 
+ const tasks = [
+-  {
+-    name: 'mihomo-alpha',
+-    func: () => getLatestAlphaVersion().then(() => resolveSidecar(MihomoAlpha())),
+-    retry: 5
+-  },
+-  {
+-    name: 'mihomo',
+-    func: () => getLatestReleaseVersion().then(() => resolveSidecar(mihomo())),
+-    retry: 5
+-  },
+-  {
+-    name: 'mihomo-smart',
+-    func: () => getLatestSmartVersion().then(() => resolveSidecar(mihomoSmart())),
+-    retry: 5
+-  },
++  { name: 'mihomo', func: () => resolveSidecar(mihomo()), retry: 5 },
+   { name: 'mmdb', func: resolveMmdb, retry: 5 },
+   { name: 'metadb', func: resolveMetadb, retry: 5 },
+   { name: 'geosite', func: resolveGeosite, retry: 5 },
+diff --git a/src/main/config/app.ts b/src/main/config/app.ts
+index cd8bec4..6554ad3 100644
+--- a/src/main/config/app.ts
++++ b/src/main/config/app.ts
+@@ -35,6 +35,9 @@ export async function getAppConfig(force = false): Promise<IAppConfig> {
+       const data = await readFile(appConfigPath(), 'utf-8')
+       const parsedConfig = parse(data)
+       const mergedConfig = deepMerge(cloneDefaultConfig(), parsedConfig || {})
++      mergedConfig.enableSmartCore = false
++      mergedConfig.enableSmartOverride = false
++      if (mergedConfig.core !== 'mihomo-specific') mergedConfig.core = 'mihomo'
+       mergedConfig.maxLogFileSize = normalizeMaxLogFileSizeMB(mergedConfig.maxLogFileSize)
+       if (JSON.stringify(mergedConfig) !== JSON.stringify(parsedConfig)) {
+         await atomicWriteFile(appConfigPath(), stringify(mergedConfig))
+@@ -71,6 +74,9 @@ async function writeAppConfig(
+     if (replaceNameserverPolicy) {
+       nextConfig.nameserverPolicy = patch.nameserverPolicy ?? {}
+     }
++    nextConfig.enableSmartCore = false
++    nextConfig.enableSmartOverride = false
++    if (nextConfig.core !== 'mihomo-specific') nextConfig.core = 'mihomo'
+     nextConfig.maxLogFileSize = normalizeMaxLogFileSizeMB(nextConfig.maxLogFileSize)
+     try {
+       await atomicWriteFile(appConfigPath(), stringify(nextConfig))
+diff --git a/src/main/core/manager.ts b/src/main/core/manager.ts
+index ce55fe0..a1ba015 100644
+--- a/src/main/core/manager.ts
++++ b/src/main/core/manager.ts
+@@ -91,7 +91,7 @@ const coreShutdownTimeout = 3000
+ const resumeReloadDelay = 5000
+ // 同一次失败内核可能连打多行，10 秒内只提示一次，避免弹窗刷屏
+ const tunFailureReportInterval = 10000
+-const coreProcessNames = ['mihomo', 'mihomo-alpha', 'mihomo-smart'] as const
++const coreProcessNames = ['mihomo', 'mihomo-anytls-specific'] as const
+ 
+ // 核心进程状态
+ interface CoreProcessWatchdog {
+diff --git a/src/main/core/permissions.ts b/src/main/core/permissions.ts
+index a809b28..6763c89 100644
+--- a/src/main/core/permissions.ts
++++ b/src/main/core/permissions.ts
+@@ -15,7 +15,7 @@ const execPromise = promisify(exec)
+ const execFilePromise = promisify(execFile)
+ 
+ // 内核名称白名单
+-const ALLOWED_CORES = ['mihomo', 'mihomo-alpha', 'mihomo-smart'] as const
++const ALLOWED_CORES = ['mihomo', 'mihomo-specific'] as const
+ type AllowedCore = (typeof ALLOWED_CORES)[number]
+ type StopCoreBeforeAdminRestart = (force?: boolean) => Promise<void>
+ 
+@@ -128,8 +128,8 @@ export async function checkHighPrivilegeCore(): Promise<boolean> {
+ async function checkHighPrivilegeMihomoProcess(): Promise<boolean> {
+   const mihomoExecutables =
+     process.platform === 'win32'
+-      ? ['mihomo.exe', 'mihomo-alpha.exe', 'mihomo-smart.exe']
+-      : ['mihomo', 'mihomo-alpha', 'mihomo-smart']
++      ? ['mihomo.exe', 'mihomo-anytls-specific.exe']
++      : ['mihomo', 'mihomo-anytls-specific']
+ 
+   try {
+     if (process.platform === 'win32') {
+diff --git a/src/main/resolve/autoUpdater.ts b/src/main/resolve/autoUpdater.ts
+index d4f917f..163381b 100644
+--- a/src/main/resolve/autoUpdater.ts
++++ b/src/main/resolve/autoUpdater.ts
+@@ -31,6 +31,7 @@ interface GitHubReleaseAsset {
+ }
+ 
+ interface GitHubRelease {
++  tag_name: string
+   assets?: GitHubReleaseAsset[]
+ }
+ 
+@@ -71,13 +72,13 @@ function updaterProxy(mixedPort: number): UpdaterProxy {
+ }
+ 
+ async function getGitHubAssetSha256(
+-  version: string,
++  tag: string,
+   file: string,
+   proxy: UpdaterProxy
+ ): Promise<string> {
+-  const releaseTag = encodeURIComponent(`v${version}`)
++  const releaseTag = encodeURIComponent(tag)
+   const res = await chromeRequest.get<GitHubRelease>(
+-    `https://api.github.com/repos/mihomo-party-org/mihomo-party/releases/tags/${releaseTag}`,
++    `https://api.github.com/repos/aldington-david/clash-party/releases/tags/${releaseTag}`,
+     {
+       headers: {
+         Accept: 'application/vnd.github+json',
+@@ -100,7 +101,7 @@ export async function checkUpdate(): Promise<IAppVersion | undefined> {
+   const [{ 'mixed-port': mixedPort = DEFAULT_MIHOMO_PORTS.mixed }, { githubProxy = '' }] =
+     await Promise.all([getControledMihomoConfig(), getAppConfig()])
+   const githubUrl =
+-    'https://github.com/mihomo-party-org/mihomo-party/releases/latest/download/latest.yml'
++    'https://github.com/aldington-david/clash-party/releases/latest/download/latest.yml'
+   const res = await tryDownload(buildDownloadUrls(githubUrl, githubProxy), {
+     headers: { 'Content-Type': 'application/octet-stream' },
+     proxy: updaterProxy(mixedPort),
+@@ -150,7 +151,13 @@ export function downloadAndInstallUpdate(version: string): Promise<void> {
+ async function installUpdate(version: string): Promise<void> {
+   const [{ 'mixed-port': mixedPort = DEFAULT_MIHOMO_PORTS.mixed }, { githubProxy = '' }] =
+     await Promise.all([getControledMihomoConfig(), getAppConfig()])
+-  const githubBase = `https://github.com/mihomo-party-org/mihomo-party/releases/download/v${version}/`
++  const release = await chromeRequest.get<GitHubRelease>(
++    'https://api.github.com/repos/aldington-david/clash-party/releases/latest',
++    { responseType: 'json', timeout: 10000 }
++  )
++  const tag = release.data.tag_name
++  if (!tag?.startsWith(`v${version}-anytls-`)) throw new Error('The requested fork release is no longer latest; check for updates again')
++  const githubBase = `https://github.com/aldington-david/clash-party/releases/download/${encodeURIComponent(tag)}/`
+   const fileMap = {
+     'win32-x64': `clash-party-windows-${version}-x64-setup.exe`,
+     'win32-ia32': `clash-party-windows-${version}-ia32-setup.exe`,
+@@ -181,7 +188,7 @@ async function installUpdate(version: string): Promise<void> {
+     if (!existsSync(path.join(dataDir(), file))) {
+       let expectedHash: string
+       try {
+-        expectedHash = await getGitHubAssetSha256(version, file, proxy)
++        expectedHash = await getGitHubAssetSha256(tag, file, proxy)
+       } catch (e) {
+         await appLogger.warn(
+           'Failed to get update SHA-256 from GitHub API, falling back to release checksum file',
+diff --git a/src/main/resolve/plugin/vault.ts b/src/main/resolve/plugin/vault.ts
+index d7b995e..9c40eb5 100644
+--- a/src/main/resolve/plugin/vault.ts
++++ b/src/main/resolve/plugin/vault.ts
+@@ -44,6 +44,8 @@ type OptionalAsyncSafeStorage = {
+   decryptStringAsync?: (encrypted: Buffer) => Promise<{ result: string; shouldReEncrypt: boolean }>
+ }
+ 
++const asyncStorage = safeStorage as typeof safeStorage & OptionalAsyncSafeStorage
++
+ const ENDPOINT_KEYS = ['enroll', 'challenge', 'config', 'revoke'] as const
+ 
+ // 写出前归一化：镜像 gateway.gateway = lastGood ?? gateways[0]，直到明确停止支持应用降级（§2.3）。
+@@ -169,7 +171,7 @@ async function linuxUsesFixedKey(mode: 'persistent-async' | 'persistent-sync'):
+   try {
+     const canary =
+       mode === 'persistent-async'
+-        ? await safeStorage.encryptStringAsync('plugin-vault-canary')
++        ? await asyncStorage.encryptStringAsync!('plugin-vault-canary')
+         : safeStorage.encryptString('plugin-vault-canary')
+     linuxFixedKeyBackend = canary.subarray(0, 3).toString('latin1') === FIXED_KEY_CIPHERTEXT_PREFIX
+     return linuxFixedKeyBackend
+@@ -180,7 +182,6 @@ async function linuxUsesFixedKey(mode: 'persistent-async' | 'persistent-sync'):
+ 
+ async function storageMode(): Promise<StorageMode> {
+   if (!linuxBackendIsSecure()) return 'memory'
+-  const asyncStorage = safeStorage as typeof safeStorage & OptionalAsyncSafeStorage
+   let mode: 'persistent-async' | 'persistent-sync' | undefined
+   if (
+     typeof asyncStorage.isAsyncEncryptionAvailable === 'function' &&
+@@ -219,7 +220,7 @@ export async function ensureVaultWritable(): Promise<void> {
+ 
+   try {
+     if (mode === 'persistent-async') {
+-      await safeStorage.encryptStringAsync('plugin-vault-preflight')
++      await asyncStorage.encryptStringAsync!('plugin-vault-preflight')
+     } else {
+       safeStorage.encryptString('plugin-vault-preflight')
+     }
+@@ -253,7 +254,7 @@ async function writeVaultRaw(id: string, vault: IPluginVault): Promise<void> {
+   try {
+     encrypted =
+       mode === 'persistent-async'
+-        ? await safeStorage.encryptStringAsync(JSON.stringify(vault))
++        ? await asyncStorage.encryptStringAsync!(JSON.stringify(vault))
+         : safeStorage.encryptString(JSON.stringify(vault))
+   } catch {
+     throw new VaultUnavailableError()
+@@ -274,7 +275,7 @@ export function writeVault(id: string, vault: IPluginVault, signal?: AbortSignal
+ 
+ async function bestEffortReEncrypt(id: string, vault: IPluginVault): Promise<void> {
+   try {
+-    const encrypted = await safeStorage.encryptStringAsync(JSON.stringify(vault))
++    const encrypted = await asyncStorage.encryptStringAsync!(JSON.stringify(vault))
+     await atomicWriteFile(pluginVaultPath(id), encrypted, { mode: 0o600 })
+   } catch (error) {
+     await logger.warn(`[PluginVault] Failed to rotate encrypted vault ${id}`, error)
+@@ -299,7 +300,7 @@ async function readVaultUnlocked(id: string, signal?: AbortSignal): Promise<Vaul
+     if (mode === 'persistent-sync' && signal?.aborted) return { kind: 'unavailable' }
+     const { result, shouldReEncrypt } =
+       mode === 'persistent-async'
+-        ? await safeStorage.decryptStringAsync(encrypted)
++        ? await asyncStorage.decryptStringAsync!(encrypted)
+         : { result: safeStorage.decryptString(encrypted), shouldReEncrypt: false }
+     const parsed = parseVault(JSON.parse(result))
+     if (!parsed) return { kind: 'invalid' }
+diff --git a/src/main/sys/autoRun.ts b/src/main/sys/autoRun.ts
+index a821997..ed640c8 100644
+--- a/src/main/sys/autoRun.ts
++++ b/src/main/sys/autoRun.ts
+@@ -186,7 +186,7 @@ export async function enableAutoRun(): Promise<void> {
+   if (process.platform === 'darwin') {
+     await removeDarwinLegacyLoginItems()
+     app.setLoginItemSettings({ openAtLogin: true })
+-    const { openAtLogin, status } = app.getLoginItemSettings()
++    const { openAtLogin, status } = app.getLoginItemSettings() as Electron.LoginItemSettings & { status?: string }
+     if (!openAtLogin) {
+       throw new Error(`Failed to register login item${status ? ` (${status})` : ''}`)
+     }
+diff --git a/src/main/utils/dirs.ts b/src/main/utils/dirs.ts
+index 2af5ecb..3dc8b34 100644
+--- a/src/main/utils/dirs.ts
++++ b/src/main/utils/dirs.ts
+@@ -87,11 +87,9 @@ export function mihomoCoreDir(): string {
+ 
+ export function mihomoCorePath(core: string): string {
+   const isWin = process.platform === 'win32'
+-  // 处理 Smart 内核
+-  if (core === 'mihomo-smart') {
+-    return path.join(mihomoCoreDir(), `mihomo-smart${isWin ? '.exe' : ''}`)
+-  }
+-  return path.join(mihomoCoreDir(), `${core}${isWin ? '.exe' : ''}`)
++  const name = core === 'mihomo-specific' ? 'mihomo-anytls-specific' : 'mihomo'
++  const specificPath = path.join(mihomoCoreDir(), `${name}${isWin ? '.exe' : ''}`)
++  return existsSync(specificPath) ? specificPath : path.join(mihomoCoreDir(), `mihomo${isWin ? '.exe' : ''}`)
+ }
+ 
+ export function appConfigPath(): string {
+diff --git a/src/main/utils/github.test.ts b/src/main/utils/github.test.ts
+new file mode 100644
+index 0000000..4cdd103
+--- /dev/null
++++ b/src/main/utils/github.test.ts
+@@ -0,0 +1,30 @@
++import { describe, expect, it, vi } from 'vitest'
++
++const { get, stopCore, rmSync } = vi.hoisted(() => ({
++  get: vi.fn(), stopCore: vi.fn(), rmSync: vi.fn()
++}))
++vi.mock('./chromeRequest', () => ({ get }))
++vi.mock('../core/manager', () => ({ stopCore }))
++vi.mock('../config', () => ({ getAppConfig: async () => ({ githubProxy: 'https://mirror.invalid' }) }))
++vi.mock('./dirs', () => ({ mihomoCoreDir: () => 'isolated-core' }))
++vi.mock('./logger', () => ({ createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }) }))
++vi.mock('fs', async (original) => ({ ...(await original<typeof import('fs')>()), existsSync: () => true, rmSync }))
++vi.mock('fs/promises', () => ({ writeFile: vi.fn(), readFile: async () => Buffer.from('wrong archive') }))
++vi.mock('os', () => ({ platform: () => 'linux' }))
++
++describe('fork core integrity', () => {
++  it('uses direct release checksums and rejects a mirror mismatch before stopping or replacing the core', async () => {
++    get.mockImplementation(async (url: string) => ({
++      status: 200,
++      data: url.endsWith('sha256sum.txt')
++        ? `${'0'.repeat(64)}  mihomo-linux-amd64-compatible-v1.19.32.gz\n`
++        : Buffer.from('wrong archive')
++    }))
++    const { installMihomoCore } = await import('./github')
++    await expect(installMihomoCore('v1.19.32')).rejects.toThrow('Core checksum mismatch')
++    expect(get.mock.calls[0][0]).toMatch(/^https:\/\/mirror\.invalid\//)
++    expect(get.mock.calls[1][0]).toBe('https://github.com/aldington-david/mihomo/releases/download/v1.19.32/sha256sum.txt')
++    expect(stopCore).not.toHaveBeenCalled()
++    expect(rmSync.mock.calls.every(([path]) => String(path).includes('temp-core.'))).toBe(true)
++  })
++})
+diff --git a/src/main/utils/github.ts b/src/main/utils/github.ts
+index bf09002..281c62c 100644
+--- a/src/main/utils/github.ts
++++ b/src/main/utils/github.ts
+@@ -1,5 +1,6 @@
+ import { chmodSync, createWriteStream, createReadStream, existsSync, renameSync, rmSync } from 'fs'
+-import { writeFile } from 'fs/promises'
++import { readFile, writeFile } from 'fs/promises'
++import { createHash } from 'crypto'
+ import { platform } from 'os'
+ import { join } from 'path'
+ import { createGunzip } from 'zlib'
+@@ -171,6 +172,7 @@ export async function downloadGitHubAsset(url: string, outputPath: string): Prom
+  */
+ export async function installMihomoCore(version: string): Promise<void> {
+   try {
++    if (!/^v\d+\.\d+\.\d+$/.test(version)) throw new Error('Invalid stable core version')
+     log.info(`Installing mihomo core version ${version}`)
+ 
+     const plat = platform()
+@@ -178,44 +180,59 @@ export async function installMihomoCore(version: string): Promise<void> {
+ 
+     // 映射平台和架构到 GitHub Release 文件名
+     const key = `${plat}-${arch}`
+-    const name = PLATFORM_MAP[key]
++    const name = PLATFORM_MAP[key] + (plat === 'win32' && __LEGACY_BUILD__ ? '-go120' : '')
+ 
+-    if (!name) {
++    if (!PLATFORM_MAP[key]) {
+       throw new Error(`Unsupported platform "${plat}-${arch}"`)
+     }
+ 
+     const isWin = plat === 'win32'
+     const urlExt = isWin ? 'zip' : 'gz'
+-    const downloadURL = `https://github.com/MetaCubeX/mihomo/releases/download/${version}/${name}-${version}.${urlExt}`
++    const downloadURL = `https://github.com/aldington-david/mihomo/releases/download/${version}/${name}-${version}.${urlExt}`
+ 
+     const coreDir = mihomoCoreDir()
+     const tempZip = join(coreDir, `temp-core.${urlExt}`)
+-    const exeFile = `${name}${isWin ? '.exe' : ''}`
+-    const targetFile = `mihomo-specific${isWin ? '.exe' : ''}`
++    const targetFile = `mihomo-anytls-specific${isWin ? '.exe' : ''}`
+     const targetPath = join(coreDir, targetFile)
+ 
+-    // 如果目标文件已存在，先停止核心
++    await downloadGitHubAsset(downloadURL, tempZip)
++    // Checksums come directly from our release, never a GitHub download mirror.
++    const checksumResponse = await chromeRequest.get<string>(
++      `https://github.com/aldington-david/mihomo/releases/download/${version}/sha256sum.txt`,
++      { responseType: 'text', timeout: 30000 }
++    )
++    if (checksumResponse.status < 200 || checksumResponse.status >= 300) {
++      throw new Error(`Core checksum download failed: ${checksumResponse.status}`)
++    }
++    const archiveName = `${name}-${version}.${urlExt}`
++    const expectedHash = checksumResponse.data.split('\n')
++      .map((line) => line.trim().split(/\s+/))
++      .find((fields) => fields[1]?.replace(/^\*/, '') === archiveName)?.[0]
++    const actualHash = createHash('sha256').update(await readFile(tempZip)).digest('hex')
++    if (!expectedHash || !/^[a-f\d]{64}$/i.test(expectedHash) || actualHash !== expectedHash.toLowerCase()) {
++      throw new Error('Core checksum mismatch; the existing core was not replaced')
++    }
++
++    // Stop only after verification so a bad download leaves the working core running.
+     if (existsSync(targetPath)) {
+       log.debug('Stopping core before extracting new core file')
+       // 先停止核心
+       await stopCore(true)
+     }
+ 
+-    // 下载文件
+-    await downloadGitHubAsset(downloadURL, tempZip)
+-
+     // 解压文件
+     if (urlExt === 'zip') {
+       log.debug(`Extracting ZIP file ${tempZip}`)
+       const zip = new AdmZip(tempZip)
+       const entries = zip.getEntries()
+-      const entry = entries.find((e) => e.entryName.includes(exeFile))
++      const binaries = entries.filter((e) => !e.isDirectory && /^mihomo[^/\\]*\.exe$/.test(e.entryName))
++      const entry = binaries.length === 1 ? binaries[0] : undefined
+ 
+       if (entry) {
+         zip.extractEntryTo(entry, coreDir, false, true, false, targetFile)
+-        log.debug(`Successfully extracted ${exeFile} to ${targetPath}`)
++        log.debug(`Successfully extracted ${entry.entryName} to ${targetPath}`)
+       } else {
+-        throw new Error(`Executable file not found in zip: ${exeFile}`)
++        throw new Error('Core ZIP must contain exactly one mihomo executable')
+       }
+     } else {
+       // 处理.gz 文件
+diff --git a/src/main/utils/init.ts b/src/main/utils/init.ts
+index c2bffe2..7c27139 100644
+--- a/src/main/utils/init.ts
++++ b/src/main/utils/init.ts
+@@ -162,7 +162,7 @@ async function killOldMihomoProcesses(): Promise<void> {
+ 
+   try {
+     const execFilePromise = promisify(execFile)
+-    const coreNames = new Set(['mihomo.exe', 'mihomo-alpha.exe', 'mihomo-smart.exe'])
++    const coreNames = new Set(['mihomo.exe', 'mihomo-anytls-specific.exe'])
+     const { stdout } = await execFilePromise('tasklist', ['/FO', 'CSV', '/NH'], {
+       windowsHide: true,
+       timeout: 3000,
+diff --git a/src/main/utils/ipc.ts b/src/main/utils/ipc.ts
+index feebb56..8219d18 100644
+--- a/src/main/utils/ipc.ts
++++ b/src/main/utils/ipc.ts
+@@ -183,16 +183,16 @@ function registerHandlers(handlers: Record<string, AsyncFn | SyncFn>, async = tr
+ async function fetchMihomoTags(
+   forceRefresh = false
+ ): Promise<{ name: string; zipball_url: string; tarball_url: string }[]> {
+-  return await getGitHubTags('MetaCubeX', 'mihomo', forceRefresh)
++  return await getGitHubTags('aldington-david', 'mihomo', forceRefresh)
+ }
+ 
+ async function installSpecificMihomoCore(version: string): Promise<void> {
+-  clearVersionCache('MetaCubeX', 'mihomo')
++  clearVersionCache('aldington-david', 'mihomo')
+   return await installMihomoCore(version)
+ }
+ 
+ async function clearMihomoVersionCache(): Promise<void> {
+-  clearVersionCache('MetaCubeX', 'mihomo')
++  clearVersionCache('aldington-david', 'mihomo')
+ }
+ 
+ async function getRuleStr(id: string): Promise<string> {
+diff --git a/src/main/window.ts b/src/main/window.ts
+index 4e8c41e..c91e274 100644
+--- a/src/main/window.ts
++++ b/src/main/window.ts
+@@ -1,6 +1,6 @@
+ import { join } from 'path'
+ import { readFileSync } from 'fs'
+-import { BrowserWindow, Menu, screen, shell, type IpcMainEvent } from 'electron'
++import { BrowserWindow, Menu, screen, shell, ipcMain, type IpcMainEvent } from 'electron'
+ import { is } from '@electron-toolkit/utils'
+ import icon from '../../resources/icon.png?asset'
+ import { getAppConfig } from './config'
+@@ -107,24 +107,25 @@ let initialRendererReady = false
+ 
+ // 窗口在 renderer 首屏内容（路由 + 侧边栏）就绪后再显示，避免 lazy chunk 未加载完就展示空白主区。
+ function waitForInitialContent(window: BrowserWindow): Promise<void> {
+-  const { promise, resolve } = Promise.withResolvers<void>()
++  let resolve!: () => void
++  const promise = new Promise<void>((done) => { resolve = done })
+   const { webContents } = window
+   let finished = false
+   const finish = (): void => {
+     if (finished) return
+     finished = true
+     clearTimeout(timeout)
+-    webContents.off('ipc-message', onIpcMessage)
++    ipcMain.off('rendererFirstContentReady', onIpcMessage)
+     window.off('closed', onClosed)
+     resolve()
+   }
+-  const onIpcMessage = (_event: IpcMainEvent, channel: string): void => {
+-    if (channel === 'rendererFirstContentReady') finish()
++  const onIpcMessage = (event: IpcMainEvent): void => {
++    if (event.sender === webContents) finish()
+   }
+   const onClosed = (): void => finish()
+   // 内容就绪信号的兜底超时，避免 renderer 异常时窗口永不显示。
+   const timeout = setTimeout(finish, 5000)
+-  webContents.on('ipc-message', onIpcMessage)
++  ipcMain.on('rendererFirstContentReady', onIpcMessage)
+   window.once('closed', onClosed)
+   return promise
+ }
+diff --git a/src/preload/index.d.ts b/src/preload/index.d.ts
+index 51aca36..078494f 100644
+--- a/src/preload/index.d.ts
++++ b/src/preload/index.d.ts
+@@ -1,4 +1,4 @@
+-import { webUtils } from 'electron'
++export {}
+ 
+ type IpcListener = (event: Electron.IpcRendererEvent, ...args: unknown[]) => void
+ type IpcUnsubscribe = () => void
+@@ -21,6 +21,6 @@ interface ElectronAPI {
+ declare global {
+   interface Window {
+     electron: ElectronAPI
+-    api: { webUtils: typeof webUtils }
++    api: { webUtils: { getPathForFile: (file: File) => string } }
+   }
+ }
+diff --git a/src/preload/index.ts b/src/preload/index.ts
+index 0a96cbe..69feeb4 100644
+--- a/src/preload/index.ts
++++ b/src/preload/index.ts
+@@ -1,4 +1,11 @@
+-import { contextBridge, ipcRenderer, webUtils } from 'electron'
++import * as electron from 'electron'
++
++const { contextBridge, ipcRenderer } = electron
++const webUtils = (electron as typeof electron & {
++  webUtils?: { getPathForFile: (file: File) => string }
++}).webUtils ?? {
++  getPathForFile: (file: File): string => (file as File & { path?: string }).path ?? ''
++}
+ 
+ // 允许的 invoke channels 白名单
+ const validInvokeChannels = [
+diff --git a/src/renderer/src/components/updater/updater-modal.tsx b/src/renderer/src/components/updater/updater-modal.tsx
+index c441e8e..c8e90bf 100644
+--- a/src/renderer/src/components/updater/updater-modal.tsx
++++ b/src/renderer/src/components/updater/updater-modal.tsx
+@@ -52,7 +52,7 @@ const UpdaterModal: React.FC<Props> = (props) => {
+             size="sm"
+             className="flex app-nodrag"
+             onPress={() => {
+-              open(`https://github.com/mihomo-party-org/mihomo-party/releases/tag/v${version}`)
++              open('https://github.com/aldington-david/clash-party/releases/latest')
+             }}
+           >
+             {t('common.updater.goToDownload')}
+diff --git a/src/renderer/src/pages/mihomo.tsx b/src/renderer/src/pages/mihomo.tsx
+index 09e9b27..5c1341b 100644
+--- a/src/renderer/src/pages/mihomo.tsx
++++ b/src/renderer/src/pages/mihomo.tsx
+@@ -367,6 +367,7 @@ const Mihomo: React.FC = () => {
+             <SettingItem title={t('mihomo.enableSmartCore')} divider>
+               <Switch
+                 size="sm"
++                isDisabled
+                 isSelected={enableSmartCore}
+                 color={enableSmartCore ? 'primary' : 'default'}
+                 onValueChange={async (v) => {
+@@ -482,11 +483,7 @@ const Mihomo: React.FC = () => {
+                   }
+                 }}
+               >
+-                <SelectItem key="mihomo">{t(CoreMap['mihomo'])}</SelectItem>
+-                <SelectItem key="mihomo-alpha">{t(CoreMap['mihomo-alpha'])}</SelectItem>
+-                {enableSmartCore ? (
+-                  <SelectItem key="mihomo-smart">{t(CoreMap['mihomo-smart'])}</SelectItem>
+-                ) : null}
++                <SelectItem key="mihomo">AnyTLS + REALITY</SelectItem>
+                 <SelectItem key="mihomo-specific">{t(CoreMap['mihomo-specific'])}</SelectItem>
+               </Select>
+             </SettingItem>

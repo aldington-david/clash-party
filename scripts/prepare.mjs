@@ -1,4 +1,5 @@
 import fs from 'fs'
+import { createHash } from 'crypto'
 import AdmZip from 'adm-zip'
 import path from 'path'
 import zlib from 'zlib'
@@ -26,171 +27,36 @@ function resolveTargetArch() {
 }
 const arch = resolveTargetArch()
 
-/* ======= mihomo alpha======= */
-const MIHOMO_ALPHA_VERSION_URL =
-  'https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha/version.txt'
-const MIHOMO_ALPHA_URL_PREFIX = `https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha`
-let MIHOMO_ALPHA_VERSION
-
-const MIHOMO_ALPHA_MAP = {
-  'win32-x64': 'mihomo-windows-amd64-compatible',
-  'win32-ia32': 'mihomo-windows-386',
-  'win32-arm64': 'mihomo-windows-arm64',
-  'darwin-x64': 'mihomo-darwin-amd64-compatible',
-  'darwin-arm64': 'mihomo-darwin-arm64',
-  'linux-x64': 'mihomo-linux-amd64-compatible',
-  'linux-arm64': 'mihomo-linux-arm64'
-}
-
-// Fetch the latest alpha release version from the version.txt file
-async function getLatestAlphaVersion() {
-  try {
-    const response = await fetch(MIHOMO_ALPHA_VERSION_URL, {
-      method: 'GET'
-    })
-    let v = await response.text()
-    MIHOMO_ALPHA_VERSION = v.trim() // Trim to remove extra whitespaces
-    console.log(`Latest alpha version: ${MIHOMO_ALPHA_VERSION}`)
-  } catch (error) {
-    console.error('Error fetching latest alpha version:', error.message)
-    process.exit(1)
-  }
-}
-
-/* ======= mihomo smart ======= */
-const MIHOMO_SMART_VERSION_URL =
-  'https://github.com/vernesong/mihomo/releases/download/Prerelease-Alpha/version.txt'
-const MIHOMO_SMART_URL_PREFIX = `https://github.com/vernesong/mihomo/releases/download/Prerelease-Alpha`
-let MIHOMO_SMART_VERSION
-
-const MIHOMO_SMART_MAP = {
-  'win32-x64': 'mihomo-windows-amd64-v2-go120',
-  'win32-ia32': 'mihomo-windows-386-go120',
-  'win32-arm64': 'mihomo-windows-arm64',
-  'darwin-x64': 'mihomo-darwin-amd64-v2-go120',
-  'darwin-arm64': 'mihomo-darwin-arm64',
-  'linux-x64': 'mihomo-linux-amd64-v2-go120',
-  'linux-arm64': 'mihomo-linux-arm64'
-}
-
-async function getLatestSmartVersion() {
-  try {
-    const response = await fetch(MIHOMO_SMART_VERSION_URL, {
-      method: 'GET'
-    })
-    let v = await response.text()
-    MIHOMO_SMART_VERSION = v.trim() // Trim to remove extra whitespaces
-    console.log(`Latest smart version: ${MIHOMO_SMART_VERSION}`)
-  } catch (error) {
-    console.error('Error fetching latest smart version:', error.message)
-    process.exit(1)
-  }
-}
-
-/* ======= mihomo release ======= */
-const MIHOMO_VERSION_URL =
-  'https://github.com/MetaCubeX/mihomo/releases/latest/download/version.txt'
-const MIHOMO_URL_PREFIX = `https://github.com/MetaCubeX/mihomo/releases/download`
-let MIHOMO_VERSION
-
+/* This fork bundles only the pinned AnyTLS + REALITY stable core. */
+const { core_tag: MIHOMO_VERSION } = JSON.parse(fs.readFileSync('.anytls-build.json', 'utf8'))
+if (!/^v\d+\.\d+\.\d+$/.test(MIHOMO_VERSION)) throw new Error('Invalid pinned core tag')
+const MIHOMO_URL_PREFIX = 'https://github.com/aldington-david/mihomo/releases/download'
 const MIHOMO_MAP = {
   'win32-x64': 'mihomo-windows-amd64-compatible',
-  'win32-ia32': 'mihomo-windows-386',
-  'win32-arm64': 'mihomo-windows-arm64',
   'darwin-x64': 'mihomo-darwin-amd64-compatible',
   'darwin-arm64': 'mihomo-darwin-arm64',
   'linux-x64': 'mihomo-linux-amd64-compatible',
   'linux-arm64': 'mihomo-linux-arm64'
 }
-
-// Fetch the latest release version from the version.txt file
-async function getLatestReleaseVersion() {
-  try {
-    const response = await fetch(MIHOMO_VERSION_URL, {
-      method: 'GET'
-    })
-    let v = await response.text()
-    MIHOMO_VERSION = v.trim() // Trim to remove extra whitespaces
-    console.log(`Latest release version: ${MIHOMO_VERSION}`)
-  } catch (error) {
-    console.error('Error fetching latest release version:', error.message)
-    process.exit(1)
-  }
-}
-
-/*
- * check available
- */
-if (!MIHOMO_MAP[`${platform}-${arch}`]) {
-  throw new Error(`unsupported platform "${platform}-${arch}"`)
-}
-
-if (!MIHOMO_ALPHA_MAP[`${platform}-${arch}`]) {
-  throw new Error(`unsupported platform "${platform}-${arch}"`)
-}
-
-if (!MIHOMO_SMART_MAP[`${platform}-${arch}`]) {
-  throw new Error(`unsupported platform "${platform}-${arch}"`)
-}
-
-/**
- * core info
- */
-function MihomoAlpha() {
-  const name = MIHOMO_ALPHA_MAP[`${platform}-${arch}`]
-  const isWin = platform === 'win32'
-  const urlExt = isWin ? 'zip' : 'gz'
-  const downloadURL = `${MIHOMO_ALPHA_URL_PREFIX}/${name}-${MIHOMO_ALPHA_VERSION}.${urlExt}`
-  const exeFile = `${name}${isWin ? '.exe' : ''}`
-  const zipFile = `${name}-${MIHOMO_ALPHA_VERSION}.${urlExt}`
-
-  return {
-    name: 'mihomo-alpha',
-    targetFile: `mihomo-alpha${isWin ? '.exe' : ''}`,
-    exeFile,
-    zipFile,
-    downloadURL
-  }
-}
-
 function mihomo() {
-  const name = MIHOMO_MAP[`${platform}-${arch}`]
+  let name = MIHOMO_MAP[`${platform}-${arch}`]
+  if (!name) throw new Error(`unsupported platform "${platform}-${arch}"`)
+  if (platform === 'win32' && process.env.LEGACY_BUILD === 'true') name += '-go120'
   const isWin = platform === 'win32'
-  const urlExt = isWin ? 'zip' : 'gz'
-  const downloadURL = `${MIHOMO_URL_PREFIX}/${MIHOMO_VERSION}/${name}-${MIHOMO_VERSION}.${urlExt}`
-  const exeFile = `${name}${isWin ? '.exe' : ''}`
-  const zipFile = `${name}-${MIHOMO_VERSION}.${urlExt}`
-
+  const zipFile = `${name}-${MIHOMO_VERSION}.${isWin ? 'zip' : 'gz'}`
   return {
     name: 'mihomo',
     targetFile: `mihomo${isWin ? '.exe' : ''}`,
-    exeFile,
+    exeFile: `${name}${isWin ? '.exe' : ''}`,
     zipFile,
-    downloadURL
-  }
-}
-
-function mihomoSmart() {
-  const name = MIHOMO_SMART_MAP[`${platform}-${arch}`]
-  const isWin = platform === 'win32'
-  const urlExt = isWin ? 'zip' : 'gz'
-  const downloadURL = `${MIHOMO_SMART_URL_PREFIX}/${name}-${MIHOMO_SMART_VERSION}.${urlExt}`
-  const exeFile = `${name}${isWin ? '.exe' : ''}`
-  const zipFile = `${name}-${MIHOMO_SMART_VERSION}.${urlExt}`
-
-  return {
-    name: 'mihomo-smart',
-    targetFile: `mihomo-smart${isWin ? '.exe' : ''}`,
-    exeFile,
-    zipFile,
-    downloadURL
+    downloadURL: `${MIHOMO_URL_PREFIX}/${MIHOMO_VERSION}/${zipFile}`
   }
 }
 /**
  * download sidecar and rename
  */
 async function resolveSidecar(binInfo) {
-  const { name, targetFile, zipFile, exeFile, downloadURL } = binInfo
+  const { name, targetFile, zipFile, downloadURL } = binInfo
 
   const sidecarDir = path.join(cwd, 'extra', 'sidecar')
   const sidecarPath = path.join(sidecarDir, targetFile)
@@ -201,7 +67,6 @@ async function resolveSidecar(binInfo) {
   }
   const tempDir = path.join(TEMP_DIR, name)
   const tempZip = path.join(tempDir, zipFile)
-  const tempExe = path.join(tempDir, exeFile)
 
   fs.mkdirSync(tempDir, { recursive: true })
   try {
@@ -209,13 +74,22 @@ async function resolveSidecar(binInfo) {
       await downloadFile(downloadURL, tempZip)
     }
 
+    const checksums = await fetch(`${MIHOMO_URL_PREFIX}/${MIHOMO_VERSION}/sha256sum.txt`)
+    if (!checksums.ok) throw new Error(`Cannot fetch core checksums: ${checksums.status}`)
+    const expected = (await checksums.text()).split('\n')
+      .map((line) => line.trim().split(/\s+/))
+      .find((fields) => fields[1]?.replace(/^\*/, '') === zipFile)?.[0]
+    const actual = createHash('sha256').update(fs.readFileSync(tempZip)).digest('hex')
+    if (!expected || actual !== expected.toLowerCase()) throw new Error('Core checksum mismatch')
+    fs.writeFileSync('core-build-info.json', JSON.stringify({
+      repository: 'aldington-david/mihomo', tag: MIHOMO_VERSION, asset: zipFile, sha256: actual
+    }, null, 2))
+
     if (zipFile.endsWith('.zip')) {
       const zip = new AdmZip(tempZip)
-      zip.getEntries().forEach((entry) => {
-        console.log(`[DEBUG]: "${name}" entry name`, entry.entryName)
-      })
-      zip.extractAllTo(tempDir, true)
-      fs.renameSync(tempExe, sidecarPath)
+      const entries = zip.getEntries().filter((entry) => !entry.isDirectory && /^mihomo[^/\\]*\.exe$/.test(entry.entryName))
+      if (entries.length !== 1) throw new Error('Core ZIP must contain exactly one mihomo executable')
+      fs.writeFileSync(sidecarPath, entries[0].getData())
       console.log(`[INFO]: "${name}" unzip finished`)
     } else if (zipFile.endsWith('.tgz')) {
       // tgz
@@ -259,7 +133,7 @@ async function resolveSidecar(binInfo) {
     }
   } catch (err) {
     // 需要删除文件
-    fs.rmSync(sidecarPath)
+    fs.rmSync(sidecarPath, { force: true })
     throw err
   } finally {
     fs.rmSync(tempDir, { recursive: true })
@@ -508,21 +382,7 @@ const resolveFont = async () => {
 }
 
 const tasks = [
-  {
-    name: 'mihomo-alpha',
-    func: () => getLatestAlphaVersion().then(() => resolveSidecar(MihomoAlpha())),
-    retry: 5
-  },
-  {
-    name: 'mihomo',
-    func: () => getLatestReleaseVersion().then(() => resolveSidecar(mihomo())),
-    retry: 5
-  },
-  {
-    name: 'mihomo-smart',
-    func: () => getLatestSmartVersion().then(() => resolveSidecar(mihomoSmart())),
-    retry: 5
-  },
+  { name: 'mihomo', func: () => resolveSidecar(mihomo()), retry: 5 },
   { name: 'mmdb', func: resolveMmdb, retry: 5 },
   { name: 'metadb', func: resolveMetadb, retry: 5 },
   { name: 'geosite', func: resolveGeosite, retry: 5 },

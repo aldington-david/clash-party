@@ -1,0 +1,178 @@
+name: Sync stable upstream and release AnyTLS REALITY
+
+on:
+  push:
+    branches: [anytls-reality]
+    paths: ['.anytls/**', '.github/workflows/fork-release.yml']
+  schedule:
+    - cron: '27 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      build: ${{ steps.prepare.outputs.build }}
+      tag: ${{ steps.prepare.outputs.tag }}
+      source_commit: ${{ steps.prepare.outputs.source_commit }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - name: Resolve stable releases and preserve patched source
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python .anytls/release.py prepare
+      - name: Keep the scheduled synchronizer active
+        if: github.event_name == 'schedule'
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [ "$(( $(date +%s) - $(git log -1 --format=%ct) ))" -gt 2592000 ]; then
+            git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit --allow-empty -m 'Keep stable-release synchronization active'
+            git push origin "HEAD:refs/heads/$DEFAULT_BRANCH"
+          fi
+
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.build == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux-amd64
+            runner: ubuntu-24.04
+            arch: x64
+            platform: linux
+            legacy: 'false'
+          - id: linux-arm64
+            runner: ubuntu-24.04
+            arch: arm64
+            platform: linux
+            legacy: 'false'
+          - id: macos-arm64
+            runner: macos-15
+            arch: arm64
+            platform: mac
+            legacy: 'false'
+          - id: macos-x64
+            runner: macos-15
+            arch: x64
+            platform: mac
+            legacy: 'false'
+          - id: win7-x64
+            runner: windows-2022
+            arch: x64
+            platform: win
+            legacy: 'true'
+          - id: windows-x64
+            runner: windows-2022
+            arch: x64
+            platform: win
+            legacy: 'false'
+    runs-on: ${{ matrix.runner }}
+    env:
+      npm_config_arch: ${{ matrix.arch }}
+      npm_config_target_arch: ${{ matrix.arch }}
+      LEGACY_BUILD: ${{ matrix.legacy }}
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.prepare.outputs.source_commit }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - name: Verify fork source
+        run: python .anytls/check.py
+      - name: Configure Win7 package
+        if: matrix.legacy == 'true'
+        shell: bash
+        run: |
+          node --input-type=module -e "import fs from 'node:fs'; const p=JSON.parse(fs.readFileSync('package.json')); p.devDependencies.electron='22.3.27'; p.type='commonjs'; fs.writeFileSync('package.json', JSON.stringify(p,null,2)+'\n'); fs.writeFileSync('electron-builder.yml', fs.readFileSync('electron-builder.yml','utf8').replaceAll('clash-party-windows-', 'clash-party-win7-'));"
+      - name: Install dependencies
+        if: matrix.legacy != 'true'
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install Win7 dependencies
+        if: matrix.legacy == 'true'
+        run: pnpm install --no-frozen-lockfile --ignore-scripts
+      - name: Prepare Electron and native modules
+        run: pnpm run postinstall
+      - name: Prepare pinned core and resources
+        run: node scripts/prepare.mjs --${{ matrix.arch }}
+      - name: Type check
+        run: pnpm typecheck
+      - name: Check core download integrity and legacy vault fallback
+        run: pnpm exec vitest run src/main/utils/github.test.ts src/main/resolve/plugin/vault.test.ts
+      - name: Configure Linux package
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          sed -i 's/productName: Clash Party/productName: clash-party/' electron-builder.yml
+      - name: Make macOS install scripts executable
+        if: matrix.platform == 'mac'
+        run: chmod +x build/pkg-scripts/postinstall build/pkg-scripts/preinstall
+      - name: Build requested installer
+        run: pnpm build:${{ matrix.platform }} --${{ matrix.arch }}
+      - name: Collect installer and provenance
+        shell: bash
+        env:
+          BUILD_ID: ${{ matrix.id }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, shutil, subprocess
+          out = pathlib.Path('release-assets')
+          out.mkdir()
+          files = [p for p in pathlib.Path('dist').iterdir() if p.suffix in ('.deb', '.pkg', '.exe')]
+          assert len(files) == 1, files
+          shutil.copy2(files[0], out / files[0].name)
+          info = json.loads(pathlib.Path('core-build-info.json').read_text())
+          info.update(build=os.environ['BUILD_ID'], source_commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip())
+          (out / ('core-build-info-' + os.environ['BUILD_ID'] + '.json')).write_text(json.dumps(info, indent=2))
+          PY
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.id }}
+          path: release-assets/*
+          if-no-files-found: error
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          merge-multiple: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - name: Publish only the complete six-platform release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+        run: python .anytls/release.py publish
