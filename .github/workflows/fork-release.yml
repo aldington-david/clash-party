@@ -121,6 +121,8 @@ jobs:
         run: node scripts/prepare.mjs --${{ matrix.arch }}
       - name: Type check
         run: pnpm typecheck
+      - name: Check core download integrity and legacy vault fallback
+        run: pnpm exec vitest run src/main/utils/github.test.ts src/main/resolve/plugin/vault.test.ts
       - name: Configure Linux package
         if: matrix.platform == 'linux'
         shell: bash

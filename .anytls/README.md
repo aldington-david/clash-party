@@ -25,6 +25,8 @@ Bundled cores are pinned and their archives checked against the core release's
 `sha256sum.txt`. Alpha and Smart cores are disabled. The specific-version picker
 uses the custom core repository and a separate filename, so old official specific
 cores are not reused. The core's own updater must also point at the custom repo.
+Specific-version downloads may use the configured mirror, but their hashes must
+match the checksum manifest fetched directly from the custom GitHub release.
 Application updates use this repository's Releases and validate download hashes.
 An update with the same upstream app version but a newer core does not trigger
 the upstream app-version comparator; download that installer manually or update

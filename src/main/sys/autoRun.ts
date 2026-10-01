@@ -186,7 +186,7 @@ export async function enableAutoRun(): Promise<void> {
   if (process.platform === 'darwin') {
     await removeDarwinLegacyLoginItems()
     app.setLoginItemSettings({ openAtLogin: true })
-    const { openAtLogin, status } = app.getLoginItemSettings()
+    const { openAtLogin, status } = app.getLoginItemSettings() as Electron.LoginItemSettings & { status?: string }
     if (!openAtLogin) {
       throw new Error(`Failed to register login item${status ? ` (${status})` : ''}`)
     }

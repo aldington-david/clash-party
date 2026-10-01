@@ -1,4 +1,11 @@
-import { contextBridge, ipcRenderer, webUtils } from 'electron'
+import * as electron from 'electron'
+
+const { contextBridge, ipcRenderer } = electron
+const webUtils = (electron as typeof electron & {
+  webUtils?: { getPathForFile: (file: File) => string }
+}).webUtils ?? {
+  getPathForFile: (file: File): string => (file as File & { path?: string }).path ?? ''
+}
 
 // 允许的 invoke channels 白名单
 const validInvokeChannels = [
