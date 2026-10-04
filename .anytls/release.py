@@ -10,9 +10,20 @@ import sys
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+from overlay import apply as apply_overlay, verify_download_sources
+
 ROOT = Path(__file__).resolve().parents[1]
 UPSTREAM = 'mihomo-party-org/clash-party'
 CORE = 'aldington-david/mihomo'
+BUILD_CORES = {
+    'linux-amd64': 'linux-amd64-compatible',
+    'linux-arm64': 'linux-arm64',
+    'macos-arm64': 'darwin-arm64',
+    'macos-x64': 'darwin-amd64-compatible',
+    'win7-x64': 'windows-amd64-compatible-go120',
+    'windows-x64': 'windows-amd64-compatible',
+}
+METADATA = {'build-info.json', 'latest.yml', 'checksums.sha256'}
 
 
 def run(*args, cwd=ROOT):
@@ -54,6 +65,45 @@ def installers(version):
     }
 
 
+def recipe_sha256():
+    digest = hashlib.sha256()
+    for name in ('.anytls/client.patch', '.anytls/overlay.py', '.anytls/check.py',
+                 '.anytls/release.py'):
+        digest.update(name.encode() + b'\0' + (ROOT / name).read_bytes().replace(b'\r\n', b'\n'))
+    return digest.hexdigest()
+
+
+def verify_release_assets(release, version, *, draft=False):
+    expected = installers(version) | METADATA
+    assets = release['assets']
+    if release['draft'] != draft or release.get('prerelease', False):
+        raise ValueError('Release publication state changed; refusing to modify it')
+    if (len(assets) != len(expected) or {asset['name'] for asset in assets} != expected
+            or any(asset['size'] <= 0 or asset.get('state') != 'uploaded' for asset in assets)):
+        raise ValueError('Release assets are incomplete or unexpected; refusing to treat it as complete')
+
+
+def verify_source_info(info, app_tag, core_tag, core_sha):
+    if info['app_tag'] != app_tag or info['core_tag'] != core_tag or info['core_sha'] != core_sha:
+        raise ValueError('Source tag no longer matches the selected stable app/core')
+    if info.get('recipe_sha256') != recipe_sha256():
+        raise ValueError('Unpublished source tag uses an older recipe; back it up and recreate it before retrying')
+
+
+def verify_builds(builds, info, core_assets):
+    if len(builds) != len(BUILD_CORES) or {build['build'] for build in builds} != set(BUILD_CORES):
+        raise ValueError('Expected one build record for each of the six requested installers')
+    for build in builds:
+        target = BUILD_CORES[build['build']]
+        extension = 'zip' if target.startswith('windows') else 'gz'
+        asset = f'mihomo-{target}-{info["core_tag"]}.{extension}'
+        if (build['repository'] != CORE or build['tag'] != info['core_tag']
+                or build['source_commit'] != info['source_commit'] or build['asset'] != asset
+                or not re.fullmatch(r'[a-f0-9]{64}', build['sha256'])
+                or core_assets.get(asset) != 'sha256:' + build['sha256']):
+            raise ValueError(f'Unexpected source or core binding for {build["build"]}')
+
+
 def output(**values):
     with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as file:
         for key, value in values.items():
@@ -72,7 +122,7 @@ def prepare():
     release_tag = f'{app_tag}-anytls-{core_tag}'
     release = api(f'repos/{repository}/releases/tags/{release_tag}')
     if release and not release['draft']:
-        assert installers(app_tag[1:]) <= {asset['name'] for asset in release['assets']}
+        verify_release_assets(release, app_tag[1:])
         output(build='false')
         return
 
@@ -91,14 +141,13 @@ def prepare():
         run('git', 'fetch', 'origin', f'refs/tags/{release_tag}')
         run('git', 'worktree', 'add', '--detach', str(source), 'FETCH_HEAD')
         info = json.loads((source / '.anytls-build.json').read_text())
-        assert info['app_tag'] == app_tag and info['core_tag'] == core_tag
-        assert info['core_sha'] == core_sha, 'Core source tag moved; refusing silent replacement'
+        verify_source_info(info, app_tag, core_tag, core_sha)
+        verify_download_sources(source)
     else:
         run('git', 'fetch', f'https://github.com/{UPSTREAM}.git', f'refs/tags/{app_tag}')
         upstream_commit = run('git', 'rev-parse', 'FETCH_HEAD')
         run('git', 'worktree', 'add', '--detach', str(source), upstream_commit)
-        run('git', 'apply', '--check', str(ROOT / '.anytls/client.patch'), cwd=source)
-        run('git', 'apply', str(ROOT / '.anytls/client.patch'), cwd=source)
+        apply_overlay(source)
         shutil.rmtree(source / '.github/workflows')
         shutil.copytree(ROOT / '.github/workflows', source / '.github/workflows')
         shutil.copytree(ROOT / '.anytls', source / '.anytls', ignore=shutil.ignore_patterns('__pycache__'))
@@ -108,6 +157,7 @@ def prepare():
             'release_tag': release_tag,
             'overlay_commit': run('git', 'rev-parse', 'HEAD'),
             'patch_sha256': hashlib.sha256((ROOT / '.anytls/client.patch').read_bytes()).hexdigest(),
+            'recipe_sha256': recipe_sha256(),
             'macos_signing': 'ad-hoc app / unsigned pkg, not notarized',
         }
         (source / '.anytls-build.json').write_text(json.dumps(info, indent=2) + '\n')
@@ -115,8 +165,7 @@ def prepare():
         run('git', 'add', '-A', cwd=source)
         run('git', '-c', 'user.name=github-actions[bot]', '-c',
             'user.email=41898282+github-actions[bot]@users.noreply.github.com',
-            '-c', 'core.hooksPath=/dev/null', 'commit', '-m',
-            f'Build {app_tag} with AnyTLS + REALITY {core_tag}', cwd=source)
+            'commit', '-m', f'chore(release): build {app_tag} with AnyTLS REALITY {core_tag}', cwd=source)
         run('git', 'push', 'origin', f'HEAD:refs/tags/{release_tag}', cwd=source)
     output(build='true', tag=release_tag, app_tag=app_tag, core_tag=core_tag,
            source_commit=run('git', 'rev-parse', 'HEAD', cwd=source))
@@ -130,10 +179,15 @@ def publish():
     actual = {p.name for p in directory.iterdir() if p.suffix in ('.deb', '.pkg', '.exe')}
     assert actual == installers(version), (actual, installers(version))
     builds = sorted(directory.glob('core-build-info-*.json'))
-    assert len(builds) == 6
+    expected_files = installers(version) | {f'core-build-info-{name}.json' for name in BUILD_CORES}
+    if {p.name for p in directory.iterdir()} != expected_files or any(p.stat().st_size <= 0 for p in directory.iterdir()):
+        raise ValueError('Missing, empty, or unexpected build artifacts')
     info['source_commit'] = run('git', 'rev-list', '-n', '1', tag)
     info['builds'] = [json.loads(p.read_text()) for p in builds]
-    assert all(build['tag'] == info['core_tag'] for build in info['builds'])
+    core_release = api(f'repos/{CORE}/releases/tags/{info["core_tag"]}')
+    if stable_tag(core_release) != info['core_tag']:
+        raise ValueError('Core release changed during the build')
+    verify_builds(info['builds'], info, {asset['name']: asset.get('digest') for asset in core_release['assets']})
     (directory / 'build-info.json').write_text(json.dumps(info, indent=2) + '\n')
     for path in builds:
         path.unlink()
@@ -157,6 +211,7 @@ def publish():
         run('gh', 'release', 'create', tag, '--draft', '--verify-tag', '--title',
             f'{info["app_tag"]} + AnyTLS REALITY {info["core_tag"]}', '--notes-file', 'release-notes.md')
     run('gh', 'release', 'upload', tag, *map(str, sorted(directory.iterdir())), '--clobber')
+    verify_release_assets(api(f'repos/{repository}/releases/tags/{tag}'), version, draft=True)
     run('gh', 'release', 'edit', tag, '--draft=false', '--latest', '--notes-file', 'release-notes.md')
 
 

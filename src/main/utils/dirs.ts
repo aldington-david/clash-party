@@ -89,7 +89,9 @@ export function mihomoCorePath(core: string): string {
   const isWin = process.platform === 'win32'
   const name = core === 'mihomo-specific' ? 'mihomo-anytls-specific' : 'mihomo'
   const specificPath = path.join(mihomoCoreDir(), `${name}${isWin ? '.exe' : ''}`)
-  return existsSync(specificPath) ? specificPath : path.join(mihomoCoreDir(), `mihomo${isWin ? '.exe' : ''}`)
+  return existsSync(specificPath)
+    ? specificPath
+    : path.join(mihomoCoreDir(), `mihomo${isWin ? '.exe' : ''}`)
 }
 
 export function appConfigPath(): string {

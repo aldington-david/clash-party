@@ -205,11 +205,18 @@ export async function installMihomoCore(version: string): Promise<void> {
       throw new Error(`Core checksum download failed: ${checksumResponse.status}`)
     }
     const archiveName = `${name}-${version}.${urlExt}`
-    const expectedHash = checksumResponse.data.split('\n')
+    const expectedHash = checksumResponse.data
+      .split('\n')
       .map((line) => line.trim().split(/\s+/))
       .find((fields) => fields[1]?.replace(/^\*/, '') === archiveName)?.[0]
-    const actualHash = createHash('sha256').update(await readFile(tempZip)).digest('hex')
-    if (!expectedHash || !/^[a-f\d]{64}$/i.test(expectedHash) || actualHash !== expectedHash.toLowerCase()) {
+    const actualHash = createHash('sha256')
+      .update(await readFile(tempZip))
+      .digest('hex')
+    if (
+      !expectedHash ||
+      !/^[a-f\d]{64}$/i.test(expectedHash) ||
+      actualHash !== expectedHash.toLowerCase()
+    ) {
       throw new Error('Core checksum mismatch; the existing core was not replaced')
     }
 
@@ -225,7 +232,9 @@ export async function installMihomoCore(version: string): Promise<void> {
       log.debug(`Extracting ZIP file ${tempZip}`)
       const zip = new AdmZip(tempZip)
       const entries = zip.getEntries()
-      const binaries = entries.filter((e) => !e.isDirectory && /^mihomo[^/\\]*\.exe$/.test(e.entryName))
+      const binaries = entries.filter(
+        (e) => !e.isDirectory && /^mihomo[^/\\]*\.exe$/.test(e.entryName)
+      )
       const entry = binaries.length === 1 ? binaries[0] : undefined
 
       if (entry) {

@@ -76,19 +76,33 @@ async function resolveSidecar(binInfo) {
 
     const checksums = await fetch(`${MIHOMO_URL_PREFIX}/${MIHOMO_VERSION}/sha256sum.txt`)
     if (!checksums.ok) throw new Error(`Cannot fetch core checksums: ${checksums.status}`)
-    const expected = (await checksums.text()).split('\n')
+    const expected = (await checksums.text())
+      .split('\n')
       .map((line) => line.trim().split(/\s+/))
       .find((fields) => fields[1]?.replace(/^\*/, '') === zipFile)?.[0]
     const actual = createHash('sha256').update(fs.readFileSync(tempZip)).digest('hex')
     if (!expected || actual !== expected.toLowerCase()) throw new Error('Core checksum mismatch')
-    fs.writeFileSync('core-build-info.json', JSON.stringify({
-      repository: 'aldington-david/mihomo', tag: MIHOMO_VERSION, asset: zipFile, sha256: actual
-    }, null, 2))
+    fs.writeFileSync(
+      'core-build-info.json',
+      JSON.stringify(
+        {
+          repository: 'aldington-david/mihomo',
+          tag: MIHOMO_VERSION,
+          asset: zipFile,
+          sha256: actual
+        },
+        null,
+        2
+      )
+    )
 
     if (zipFile.endsWith('.zip')) {
       const zip = new AdmZip(tempZip)
-      const entries = zip.getEntries().filter((entry) => !entry.isDirectory && /^mihomo[^/\\]*\.exe$/.test(entry.entryName))
-      if (entries.length !== 1) throw new Error('Core ZIP must contain exactly one mihomo executable')
+      const entries = zip
+        .getEntries()
+        .filter((entry) => !entry.isDirectory && /^mihomo[^/\\]*\.exe$/.test(entry.entryName))
+      if (entries.length !== 1)
+        throw new Error('Core ZIP must contain exactly one mihomo executable')
       fs.writeFileSync(sidecarPath, entries[0].getData())
       console.log(`[INFO]: "${name}" unzip finished`)
     } else if (zipFile.endsWith('.tgz')) {

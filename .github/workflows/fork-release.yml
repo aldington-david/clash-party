@@ -31,6 +31,10 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.x'
+      - name: Verify overlay and release constraints
+        run: |
+          python .anytls/test_release.py
+          python .anytls/check.py
       - name: Resolve stable releases and preserve patched source
         id: prepare
         env:

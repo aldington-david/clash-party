@@ -2,13 +2,10 @@
 from pathlib import Path
 import subprocess
 
+from overlay import verify_download_sources
+
 root = Path(__file__).resolve().parents[1]
-for name in ('scripts/prepare.mjs', 'src/main/utils/github.ts', 'src/main/utils/ipc.ts',
-             'src/main/resolve/autoUpdater.ts'):
-    source = (root / name).read_text(encoding='utf-8')
-    for forbidden in ('MetaCubeX/mihomo', "'MetaCubeX', 'mihomo'", 'vernesong/mihomo',
-                      'mihomo-party-org/mihomo-party/releases'):
-        assert forbidden not in source, (name, forbidden)
+verify_download_sources(root)
 prepare = (root / 'scripts/prepare.mjs').read_text(encoding='utf-8')
 assert 'sha256sum.txt' in prepare and 'Core checksum mismatch' in prepare
 assert 'mihomo-alpha' not in prepare and 'mihomo-smart' not in prepare

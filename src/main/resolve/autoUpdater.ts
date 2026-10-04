@@ -156,7 +156,8 @@ async function installUpdate(version: string): Promise<void> {
     { responseType: 'json', timeout: 10000 }
   )
   const tag = release.data.tag_name
-  if (!tag?.startsWith(`v${version}-anytls-`)) throw new Error('The requested fork release is no longer latest; check for updates again')
+  if (!tag?.startsWith(`v${version}-anytls-`))
+    throw new Error('The requested fork release is no longer latest; check for updates again')
   const githubBase = `https://github.com/aldington-david/clash-party/releases/download/${encodeURIComponent(tag)}/`
   const fileMap = {
     'win32-x64': `clash-party-windows-${version}-x64-setup.exe`,

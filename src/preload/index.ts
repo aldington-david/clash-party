@@ -1,9 +1,11 @@
 import * as electron from 'electron'
 
 const { contextBridge, ipcRenderer } = electron
-const webUtils = (electron as typeof electron & {
-  webUtils?: { getPathForFile: (file: File) => string }
-}).webUtils ?? {
+const webUtils = (
+  electron as typeof electron & {
+    webUtils?: { getPathForFile: (file: File) => string }
+  }
+).webUtils ?? {
   getPathForFile: (file: File): string => (file as File & { path?: string }).path ?? ''
 }
 

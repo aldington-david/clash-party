@@ -13,6 +13,11 @@ The workflow checks out the exact upstream app tag, applies the patch with
 patched tree and `.anytls-build.json`. A patch conflict fails the workflow and
 requires updating the patch. Build failures leave only the source tag for retries;
 a public Release appears only after all six installers are built and checked.
+Repository URLs are replaced separately with exact occurrence checks, so UI
+layout changes do not invalidate URL-only edits. Structural patches remain strict.
+Unpublished tags must match the current source recipe fingerprint before reuse;
+an outdated tag stops with an explicit recovery message instead of rebuilding old
+sources. Published releases are never rebuilt by this maintenance check.
 
 Only Linux amd64/arm64 DEB, macOS arm64/x64 PKG, Windows x64 NSIS and Win7 x64 NSIS
 installers are published, plus `latest.yml`, `checksums.sha256`, and provenance.
@@ -27,6 +32,10 @@ uses the custom core repository and a separate filename, so old official specifi
 cores are not reused. The core's own updater must also point at the custom repo.
 Specific-version downloads may use the configured mirror, but their hashes must
 match the checksum manifest fetched directly from the custom GitHub release.
+Source checks cover tracked application/build code, including newly added files.
+The only official-release URL exceptions are the existing LightGBM model-data
+URL and the upstream release-note/Telegram helper literals, which this workflow
+does not invoke. Geography, theme, and other resource repositories remain allowed.
 Application updates use this repository's Releases and validate download hashes.
 An update with the same upstream app version but a newer core does not trigger
 the upstream app-version comparator; download that installer manually or update
@@ -38,4 +47,6 @@ GitHub may delay cron jobs. A monthly empty control-branch commit keeps the publ
 repository active so the scheduled workflow is not disabled for inactivity.
 
 Run `python .anytls/check.py` to check fork sources and release input validation.
+Run `python .anytls/test_release.py` for offline rejection tests, including stale
+recipes, unexpected downloads, mismatched build provenance, and incomplete drafts.
 The production app is never run by these checks.

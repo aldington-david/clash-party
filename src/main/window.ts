@@ -108,7 +108,9 @@ let initialRendererReady = false
 // 窗口在 renderer 首屏内容（路由 + 侧边栏）就绪后再显示，避免 lazy chunk 未加载完就展示空白主区。
 function waitForInitialContent(window: BrowserWindow): Promise<void> {
   let resolve!: () => void
-  const promise = new Promise<void>((done) => { resolve = done })
+  const promise = new Promise<void>((done) => {
+    resolve = done
+  })
   const { webContents } = window
   let finished = false
   const finish = (): void => {

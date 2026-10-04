@@ -55,7 +55,7 @@ index 69a05cd..2ed79e8 100644
    category: Utility
    artifactName: clash-party-linux-${version}-${arch}.${ext}
 diff --git a/scripts/prepare.mjs b/scripts/prepare.mjs
-index 0cfb6bb..d037c93 100644
+index 0cfb6bb..26241fe 100644
 --- a/scripts/prepare.mjs
 +++ b/scripts/prepare.mjs
 @@ -1,4 +1,5 @@
@@ -215,8 +215,7 @@ index 0cfb6bb..d037c93 100644
      name: 'mihomo',
      targetFile: `mihomo${isWin ? '.exe' : ''}`,
 -    exeFile,
-+    exeFile: `${name}${isWin ? '.exe' : ''}`,
-     zipFile,
+-    zipFile,
 -    downloadURL
 -  }
 -}
@@ -233,7 +232,8 @@ index 0cfb6bb..d037c93 100644
 -    name: 'mihomo-smart',
 -    targetFile: `mihomo-smart${isWin ? '.exe' : ''}`,
 -    exeFile,
--    zipFile,
++    exeFile: `${name}${isWin ? '.exe' : ''}`,
+     zipFile,
 -    downloadURL
 +    downloadURL: `${MIHOMO_URL_PREFIX}/${MIHOMO_VERSION}/${zipFile}`
    }
@@ -255,20 +255,31 @@ index 0cfb6bb..d037c93 100644
  
    fs.mkdirSync(tempDir, { recursive: true })
    try {
-@@ -209,13 +74,22 @@ async function resolveSidecar(binInfo) {
+@@ -209,13 +74,36 @@ async function resolveSidecar(binInfo) {
        await downloadFile(downloadURL, tempZip)
      }
  
 +    const checksums = await fetch(`${MIHOMO_URL_PREFIX}/${MIHOMO_VERSION}/sha256sum.txt`)
 +    if (!checksums.ok) throw new Error(`Cannot fetch core checksums: ${checksums.status}`)
-+    const expected = (await checksums.text()).split('\n')
++    const expected = (await checksums.text())
++      .split('\n')
 +      .map((line) => line.trim().split(/\s+/))
 +      .find((fields) => fields[1]?.replace(/^\*/, '') === zipFile)?.[0]
 +    const actual = createHash('sha256').update(fs.readFileSync(tempZip)).digest('hex')
 +    if (!expected || actual !== expected.toLowerCase()) throw new Error('Core checksum mismatch')
-+    fs.writeFileSync('core-build-info.json', JSON.stringify({
-+      repository: 'aldington-david/mihomo', tag: MIHOMO_VERSION, asset: zipFile, sha256: actual
-+    }, null, 2))
++    fs.writeFileSync(
++      'core-build-info.json',
++      JSON.stringify(
++        {
++          repository: 'aldington-david/mihomo',
++          tag: MIHOMO_VERSION,
++          asset: zipFile,
++          sha256: actual
++        },
++        null,
++        2
++      )
++    )
 +
      if (zipFile.endsWith('.zip')) {
        const zip = new AdmZip(tempZip)
@@ -277,13 +288,16 @@ index 0cfb6bb..d037c93 100644
 -      })
 -      zip.extractAllTo(tempDir, true)
 -      fs.renameSync(tempExe, sidecarPath)
-+      const entries = zip.getEntries().filter((entry) => !entry.isDirectory && /^mihomo[^/\\]*\.exe$/.test(entry.entryName))
-+      if (entries.length !== 1) throw new Error('Core ZIP must contain exactly one mihomo executable')
++      const entries = zip
++        .getEntries()
++        .filter((entry) => !entry.isDirectory && /^mihomo[^/\\]*\.exe$/.test(entry.entryName))
++      if (entries.length !== 1)
++        throw new Error('Core ZIP must contain exactly one mihomo executable')
 +      fs.writeFileSync(sidecarPath, entries[0].getData())
        console.log(`[INFO]: "${name}" unzip finished`)
      } else if (zipFile.endsWith('.tgz')) {
        // tgz
-@@ -259,7 +133,7 @@ async function resolveSidecar(binInfo) {
+@@ -259,7 +147,7 @@ async function resolveSidecar(binInfo) {
      }
    } catch (err) {
      // 需要删除文件
@@ -292,7 +306,7 @@ index 0cfb6bb..d037c93 100644
      throw err
    } finally {
      fs.rmSync(tempDir, { recursive: true })
-@@ -508,21 +382,7 @@ const resolveFont = async () => {
+@@ -508,21 +396,7 @@ const resolveFont = async () => {
  }
  
  const tasks = [
@@ -377,7 +391,7 @@ index a809b28..6763c89 100644
    try {
      if (process.platform === 'win32') {
 diff --git a/src/main/resolve/autoUpdater.ts b/src/main/resolve/autoUpdater.ts
-index d4f917f..163381b 100644
+index 17f890a..fcedaaa 100644
 --- a/src/main/resolve/autoUpdater.ts
 +++ b/src/main/resolve/autoUpdater.ts
 @@ -31,6 +31,7 @@ interface GitHubReleaseAsset {
@@ -388,7 +402,7 @@ index d4f917f..163381b 100644
    assets?: GitHubReleaseAsset[]
  }
  
-@@ -71,13 +72,13 @@ function updaterProxy(mixedPort: number): UpdaterProxy {
+@@ -71,11 +72,11 @@ function updaterProxy(mixedPort: number): UpdaterProxy {
  }
  
  async function getGitHubAssetSha256(
@@ -400,36 +414,25 @@ index d4f917f..163381b 100644
 -  const releaseTag = encodeURIComponent(`v${version}`)
 +  const releaseTag = encodeURIComponent(tag)
    const res = await chromeRequest.get<GitHubRelease>(
--    `https://api.github.com/repos/mihomo-party-org/mihomo-party/releases/tags/${releaseTag}`,
-+    `https://api.github.com/repos/aldington-david/clash-party/releases/tags/${releaseTag}`,
+     `https://api.github.com/repos/aldington-david/clash-party/releases/tags/${releaseTag}`,
      {
-       headers: {
-         Accept: 'application/vnd.github+json',
-@@ -100,7 +101,7 @@ export async function checkUpdate(): Promise<IAppVersion | undefined> {
-   const [{ 'mixed-port': mixedPort = DEFAULT_MIHOMO_PORTS.mixed }, { githubProxy = '' }] =
-     await Promise.all([getControledMihomoConfig(), getAppConfig()])
-   const githubUrl =
--    'https://github.com/mihomo-party-org/mihomo-party/releases/latest/download/latest.yml'
-+    'https://github.com/aldington-david/clash-party/releases/latest/download/latest.yml'
-   const res = await tryDownload(buildDownloadUrls(githubUrl, githubProxy), {
-     headers: { 'Content-Type': 'application/octet-stream' },
-     proxy: updaterProxy(mixedPort),
-@@ -150,7 +151,13 @@ export function downloadAndInstallUpdate(version: string): Promise<void> {
+@@ -150,7 +151,14 @@ export function downloadAndInstallUpdate(version: string): Promise<void> {
  async function installUpdate(version: string): Promise<void> {
    const [{ 'mixed-port': mixedPort = DEFAULT_MIHOMO_PORTS.mixed }, { githubProxy = '' }] =
      await Promise.all([getControledMihomoConfig(), getAppConfig()])
--  const githubBase = `https://github.com/mihomo-party-org/mihomo-party/releases/download/v${version}/`
+-  const githubBase = `https://github.com/aldington-david/clash-party/releases/download/v${version}/`
 +  const release = await chromeRequest.get<GitHubRelease>(
 +    'https://api.github.com/repos/aldington-david/clash-party/releases/latest',
 +    { responseType: 'json', timeout: 10000 }
 +  )
 +  const tag = release.data.tag_name
-+  if (!tag?.startsWith(`v${version}-anytls-`)) throw new Error('The requested fork release is no longer latest; check for updates again')
++  if (!tag?.startsWith(`v${version}-anytls-`))
++    throw new Error('The requested fork release is no longer latest; check for updates again')
 +  const githubBase = `https://github.com/aldington-david/clash-party/releases/download/${encodeURIComponent(tag)}/`
    const fileMap = {
      'win32-x64': `clash-party-windows-${version}-x64-setup.exe`,
      'win32-ia32': `clash-party-windows-${version}-ia32-setup.exe`,
-@@ -181,7 +188,7 @@ async function installUpdate(version: string): Promise<void> {
+@@ -181,7 +189,7 @@ async function installUpdate(version: string): Promise<void> {
      if (!existsSync(path.join(dataDir(), file))) {
        let expectedHash: string
        try {
@@ -505,23 +508,25 @@ index d7b995e..9c40eb5 100644
      const parsed = parseVault(JSON.parse(result))
      if (!parsed) return { kind: 'invalid' }
 diff --git a/src/main/sys/autoRun.ts b/src/main/sys/autoRun.ts
-index a821997..ed640c8 100644
+index a821997..48d17fa 100644
 --- a/src/main/sys/autoRun.ts
 +++ b/src/main/sys/autoRun.ts
-@@ -186,7 +186,7 @@ export async function enableAutoRun(): Promise<void> {
+@@ -186,7 +186,9 @@ export async function enableAutoRun(): Promise<void> {
    if (process.platform === 'darwin') {
      await removeDarwinLegacyLoginItems()
      app.setLoginItemSettings({ openAtLogin: true })
 -    const { openAtLogin, status } = app.getLoginItemSettings()
-+    const { openAtLogin, status } = app.getLoginItemSettings() as Electron.LoginItemSettings & { status?: string }
++    const { openAtLogin, status } = app.getLoginItemSettings() as Electron.LoginItemSettings & {
++      status?: string
++    }
      if (!openAtLogin) {
        throw new Error(`Failed to register login item${status ? ` (${status})` : ''}`)
      }
 diff --git a/src/main/utils/dirs.ts b/src/main/utils/dirs.ts
-index 2af5ecb..3dc8b34 100644
+index 2af5ecb..0c99658 100644
 --- a/src/main/utils/dirs.ts
 +++ b/src/main/utils/dirs.ts
-@@ -87,11 +87,9 @@ export function mihomoCoreDir(): string {
+@@ -87,11 +87,11 @@ export function mihomoCoreDir(): string {
  
  export function mihomoCorePath(core: string): string {
    const isWin = process.platform === 'win32'
@@ -532,28 +537,43 @@ index 2af5ecb..3dc8b34 100644
 -  return path.join(mihomoCoreDir(), `${core}${isWin ? '.exe' : ''}`)
 +  const name = core === 'mihomo-specific' ? 'mihomo-anytls-specific' : 'mihomo'
 +  const specificPath = path.join(mihomoCoreDir(), `${name}${isWin ? '.exe' : ''}`)
-+  return existsSync(specificPath) ? specificPath : path.join(mihomoCoreDir(), `mihomo${isWin ? '.exe' : ''}`)
++  return existsSync(specificPath)
++    ? specificPath
++    : path.join(mihomoCoreDir(), `mihomo${isWin ? '.exe' : ''}`)
  }
  
  export function appConfigPath(): string {
 diff --git a/src/main/utils/github.test.ts b/src/main/utils/github.test.ts
 new file mode 100644
-index 0000000..4cdd103
+index 0000000..5c4cda3
 --- /dev/null
 +++ b/src/main/utils/github.test.ts
-@@ -0,0 +1,30 @@
+@@ -0,0 +1,45 @@
 +import { describe, expect, it, vi } from 'vitest'
 +
 +const { get, stopCore, rmSync } = vi.hoisted(() => ({
-+  get: vi.fn(), stopCore: vi.fn(), rmSync: vi.fn()
++  get: vi.fn(),
++  stopCore: vi.fn(),
++  rmSync: vi.fn()
 +}))
 +vi.mock('./chromeRequest', () => ({ get }))
 +vi.mock('../core/manager', () => ({ stopCore }))
-+vi.mock('../config', () => ({ getAppConfig: async () => ({ githubProxy: 'https://mirror.invalid' }) }))
++vi.mock('../config', () => ({
++  getAppConfig: async () => ({ githubProxy: 'https://mirror.invalid' })
++}))
 +vi.mock('./dirs', () => ({ mihomoCoreDir: () => 'isolated-core' }))
-+vi.mock('./logger', () => ({ createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }) }))
-+vi.mock('fs', async (original) => ({ ...(await original<typeof import('fs')>()), existsSync: () => true, rmSync }))
-+vi.mock('fs/promises', () => ({ writeFile: vi.fn(), readFile: async () => Buffer.from('wrong archive') }))
++vi.mock('./logger', () => ({
++  createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() })
++}))
++vi.mock('fs', async (original) => ({
++  ...(await original<typeof import('fs')>()),
++  existsSync: () => true,
++  rmSync
++}))
++vi.mock('fs/promises', () => ({
++  writeFile: vi.fn(),
++  readFile: async () => Buffer.from('wrong archive')
++}))
 +vi.mock('os', () => ({ platform: () => 'linux' }))
 +
 +describe('fork core integrity', () => {
@@ -567,13 +587,15 @@ index 0000000..4cdd103
 +    const { installMihomoCore } = await import('./github')
 +    await expect(installMihomoCore('v1.19.32')).rejects.toThrow('Core checksum mismatch')
 +    expect(get.mock.calls[0][0]).toMatch(/^https:\/\/mirror\.invalid\//)
-+    expect(get.mock.calls[1][0]).toBe('https://github.com/aldington-david/mihomo/releases/download/v1.19.32/sha256sum.txt')
++    expect(get.mock.calls[1][0]).toBe(
++      'https://github.com/aldington-david/mihomo/releases/download/v1.19.32/sha256sum.txt'
++    )
 +    expect(stopCore).not.toHaveBeenCalled()
 +    expect(rmSync.mock.calls.every(([path]) => String(path).includes('temp-core.'))).toBe(true)
 +  })
 +})
 diff --git a/src/main/utils/github.ts b/src/main/utils/github.ts
-index bf09002..281c62c 100644
+index 96e1c04..7d726ea 100644
 --- a/src/main/utils/github.ts
 +++ b/src/main/utils/github.ts
 @@ -1,5 +1,6 @@
@@ -592,7 +614,7 @@ index bf09002..281c62c 100644
      log.info(`Installing mihomo core version ${version}`)
  
      const plat = platform()
-@@ -178,44 +180,59 @@ export async function installMihomoCore(version: string): Promise<void> {
+@@ -178,9 +180,9 @@ export async function installMihomoCore(version: string): Promise<void> {
  
      // 映射平台和架构到 GitHub Release 文件名
      const key = `${plat}-${arch}`
@@ -604,10 +626,7 @@ index bf09002..281c62c 100644
        throw new Error(`Unsupported platform "${plat}-${arch}"`)
      }
  
-     const isWin = plat === 'win32'
-     const urlExt = isWin ? 'zip' : 'gz'
--    const downloadURL = `https://github.com/MetaCubeX/mihomo/releases/download/${version}/${name}-${version}.${urlExt}`
-+    const downloadURL = `https://github.com/aldington-david/mihomo/releases/download/${version}/${name}-${version}.${urlExt}`
+@@ -190,32 +192,56 @@ export async function installMihomoCore(version: string): Promise<void> {
  
      const coreDir = mihomoCoreDir()
      const tempZip = join(coreDir, `temp-core.${urlExt}`)
@@ -627,11 +646,18 @@ index bf09002..281c62c 100644
 +      throw new Error(`Core checksum download failed: ${checksumResponse.status}`)
 +    }
 +    const archiveName = `${name}-${version}.${urlExt}`
-+    const expectedHash = checksumResponse.data.split('\n')
++    const expectedHash = checksumResponse.data
++      .split('\n')
 +      .map((line) => line.trim().split(/\s+/))
 +      .find((fields) => fields[1]?.replace(/^\*/, '') === archiveName)?.[0]
-+    const actualHash = createHash('sha256').update(await readFile(tempZip)).digest('hex')
-+    if (!expectedHash || !/^[a-f\d]{64}$/i.test(expectedHash) || actualHash !== expectedHash.toLowerCase()) {
++    const actualHash = createHash('sha256')
++      .update(await readFile(tempZip))
++      .digest('hex')
++    if (
++      !expectedHash ||
++      !/^[a-f\d]{64}$/i.test(expectedHash) ||
++      actualHash !== expectedHash.toLowerCase()
++    ) {
 +      throw new Error('Core checksum mismatch; the existing core was not replaced')
 +    }
 +
@@ -651,7 +677,9 @@ index bf09002..281c62c 100644
        const zip = new AdmZip(tempZip)
        const entries = zip.getEntries()
 -      const entry = entries.find((e) => e.entryName.includes(exeFile))
-+      const binaries = entries.filter((e) => !e.isDirectory && /^mihomo[^/\\]*\.exe$/.test(e.entryName))
++      const binaries = entries.filter(
++        (e) => !e.isDirectory && /^mihomo[^/\\]*\.exe$/.test(e.entryName)
++      )
 +      const entry = binaries.length === 1 ? binaries[0] : undefined
  
        if (entry) {
@@ -677,32 +705,8 @@ index c2bffe2..7c27139 100644
      const { stdout } = await execFilePromise('tasklist', ['/FO', 'CSV', '/NH'], {
        windowsHide: true,
        timeout: 3000,
-diff --git a/src/main/utils/ipc.ts b/src/main/utils/ipc.ts
-index feebb56..8219d18 100644
---- a/src/main/utils/ipc.ts
-+++ b/src/main/utils/ipc.ts
-@@ -183,16 +183,16 @@ function registerHandlers(handlers: Record<string, AsyncFn | SyncFn>, async = tr
- async function fetchMihomoTags(
-   forceRefresh = false
- ): Promise<{ name: string; zipball_url: string; tarball_url: string }[]> {
--  return await getGitHubTags('MetaCubeX', 'mihomo', forceRefresh)
-+  return await getGitHubTags('aldington-david', 'mihomo', forceRefresh)
- }
- 
- async function installSpecificMihomoCore(version: string): Promise<void> {
--  clearVersionCache('MetaCubeX', 'mihomo')
-+  clearVersionCache('aldington-david', 'mihomo')
-   return await installMihomoCore(version)
- }
- 
- async function clearMihomoVersionCache(): Promise<void> {
--  clearVersionCache('MetaCubeX', 'mihomo')
-+  clearVersionCache('aldington-david', 'mihomo')
- }
- 
- async function getRuleStr(id: string): Promise<string> {
 diff --git a/src/main/window.ts b/src/main/window.ts
-index 4e8c41e..c91e274 100644
+index 4e8c41e..813f27e 100644
 --- a/src/main/window.ts
 +++ b/src/main/window.ts
 @@ -1,6 +1,6 @@
@@ -713,13 +717,15 @@ index 4e8c41e..c91e274 100644
  import { is } from '@electron-toolkit/utils'
  import icon from '../../resources/icon.png?asset'
  import { getAppConfig } from './config'
-@@ -107,24 +107,25 @@ let initialRendererReady = false
+@@ -107,24 +107,27 @@ let initialRendererReady = false
  
  // 窗口在 renderer 首屏内容（路由 + 侧边栏）就绪后再显示，避免 lazy chunk 未加载完就展示空白主区。
  function waitForInitialContent(window: BrowserWindow): Promise<void> {
 -  const { promise, resolve } = Promise.withResolvers<void>()
 +  let resolve!: () => void
-+  const promise = new Promise<void>((done) => { resolve = done })
++  const promise = new Promise<void>((done) => {
++    resolve = done
++  })
    const { webContents } = window
    let finished = false
    const finish = (): void => {
@@ -763,35 +769,24 @@ index 51aca36..078494f 100644
    }
  }
 diff --git a/src/preload/index.ts b/src/preload/index.ts
-index 0a96cbe..69feeb4 100644
+index 0a96cbe..49c8dc3 100644
 --- a/src/preload/index.ts
 +++ b/src/preload/index.ts
-@@ -1,4 +1,11 @@
+@@ -1,4 +1,13 @@
 -import { contextBridge, ipcRenderer, webUtils } from 'electron'
 +import * as electron from 'electron'
 +
 +const { contextBridge, ipcRenderer } = electron
-+const webUtils = (electron as typeof electron & {
-+  webUtils?: { getPathForFile: (file: File) => string }
-+}).webUtils ?? {
++const webUtils = (
++  electron as typeof electron & {
++    webUtils?: { getPathForFile: (file: File) => string }
++  }
++).webUtils ?? {
 +  getPathForFile: (file: File): string => (file as File & { path?: string }).path ?? ''
 +}
  
  // 允许的 invoke channels 白名单
  const validInvokeChannels = [
-diff --git a/src/renderer/src/components/updater/updater-modal.tsx b/src/renderer/src/components/updater/updater-modal.tsx
-index c441e8e..c8e90bf 100644
---- a/src/renderer/src/components/updater/updater-modal.tsx
-+++ b/src/renderer/src/components/updater/updater-modal.tsx
-@@ -52,7 +52,7 @@ const UpdaterModal: React.FC<Props> = (props) => {
-             size="sm"
-             className="flex app-nodrag"
-             onPress={() => {
--              open(`https://github.com/mihomo-party-org/mihomo-party/releases/tag/v${version}`)
-+              open('https://github.com/aldington-david/clash-party/releases/latest')
-             }}
-           >
-             {t('common.updater.goToDownload')}
 diff --git a/src/renderer/src/pages/mihomo.tsx b/src/renderer/src/pages/mihomo.tsx
 index 09e9b27..5c1341b 100644
 --- a/src/renderer/src/pages/mihomo.tsx
