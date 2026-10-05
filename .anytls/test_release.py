@@ -1,6 +1,8 @@
 """Offline checks for overlay drift and publication boundaries; no app or network access."""
 import copy
+import json
 from pathlib import Path
+from subprocess import CompletedProcess
 import unittest
 from unittest.mock import patch
 
@@ -9,6 +11,33 @@ import release
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_release_lookup_reads_drafts_and_public_releases_by_id(self):
+        lookup = CompletedProcess([], 0, json.dumps({
+            'apiUrl': 'https://api.github.com/repos/owner/repo/releases/123'
+        }), '')
+        for draft in (True, False):
+            expected = {'id': 123, 'draft': draft}
+            with patch('release.subprocess.run', return_value=lookup), patch('release.api', return_value=expected) as api:
+                self.assertEqual(release.release_for_tag('owner/repo', 'v1.0.0'), expected)
+                api.assert_called_once_with('repos/owner/repo/releases/123')
+
+    def test_only_a_missing_tag_is_treated_as_no_release(self):
+        with patch('release.subprocess.run', return_value=CompletedProcess([], 1, '', 'release not found\n')), patch('release.api') as api:
+            self.assertIsNone(release.release_for_tag('owner/repo', 'missing'))
+            api.assert_not_called()
+        with patch('release.subprocess.run', return_value=CompletedProcess([], 1, '', 'HTTP 502: Bad Gateway')):
+            with self.assertRaises(RuntimeError):
+                release.release_for_tag('owner/repo', 'v1.0.0')
+        lookup = CompletedProcess([], 0, json.dumps({
+            'apiUrl': 'https://api.github.com/repos/owner/repo/releases/123'
+        }), '')
+        with patch('release.subprocess.run', return_value=lookup), patch('release.api', return_value=None):
+            with self.assertRaises(RuntimeError):
+                release.release_for_tag('owner/repo', 'v1.0.0')
+        with patch('release.subprocess.run', return_value=lookup), patch('release.api', side_effect=RuntimeError('network failure')):
+            with self.assertRaisesRegex(RuntimeError, 'network failure'):
+                release.release_for_tag('owner/repo', 'v1.0.0')
+
     def verify_sources(self, extra):
         files = {name: new for name, _, new, _ in overlay.LITERALS}
         files.update(extra)

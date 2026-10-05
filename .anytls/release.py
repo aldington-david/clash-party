@@ -45,6 +45,22 @@ def api(path):
         raise
 
 
+def release_for_tag(repository, tag):
+    lookup = subprocess.run(['gh', 'release', 'view', tag, '--repo', repository, '--json', 'apiUrl'],
+                            capture_output=True, text=True, encoding='utf-8')
+    if lookup.returncode:
+        if lookup.stderr.strip() == 'release not found':
+            return None
+        raise RuntimeError('Release lookup failed: ' + lookup.stderr.strip())
+    url = json.loads(lookup.stdout)['apiUrl']
+    if not re.fullmatch(r'https://api\.github\.com/repos/' + re.escape(repository) + r'/releases/\d+', url):
+        raise ValueError('Unexpected release API URL')
+    result = api(url.removeprefix('https://api.github.com/'))
+    if result is None:
+        raise RuntimeError('Resolved release ID is no longer available')
+    return result
+
+
 def stable_tag(release):
     if not release or release['draft'] or release['prerelease']:
         raise ValueError('A published stable release is required')
@@ -204,14 +220,14 @@ def publish():
     sums = '\n'.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}' for p in paths)
     (directory / 'checksums.sha256').write_text(sums + '\n')
     repository = os.environ['GITHUB_REPOSITORY']
-    release = api(f'repos/{repository}/releases/tags/{tag}')
+    release = release_for_tag(repository, tag)
     if release and not release['draft']:
         raise RuntimeError('Refusing to modify an already published release')
     if not release:
         run('gh', 'release', 'create', tag, '--draft', '--verify-tag', '--title',
             f'{info["app_tag"]} + AnyTLS REALITY {info["core_tag"]}', '--notes-file', 'release-notes.md')
     run('gh', 'release', 'upload', tag, *map(str, sorted(directory.iterdir())), '--clobber')
-    verify_release_assets(api(f'repos/{repository}/releases/tags/{tag}'), version, draft=True)
+    verify_release_assets(release_for_tag(repository, tag), version, draft=True)
     run('gh', 'release', 'edit', tag, '--draft=false', '--latest', '--notes-file', 'release-notes.md')
 
 
