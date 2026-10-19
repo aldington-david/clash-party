@@ -161,7 +161,7 @@ def prepare():
         verify_download_sources(source)
     else:
         run('git', 'fetch', f'https://github.com/{UPSTREAM}.git', f'refs/tags/{app_tag}')
-        upstream_commit = run('git', 'rev-parse', 'FETCH_HEAD')
+        upstream_commit = run('git', 'rev-parse', 'FETCH_HEAD^{commit}')
         run('git', 'worktree', 'add', '--detach', str(source), upstream_commit)
         apply_overlay(source)
         shutil.rmtree(source / '.github/workflows')
