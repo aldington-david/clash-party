@@ -1,4 +1,4 @@
-import { webUtils } from 'electron'
+export {}
 
 type IpcListener = (event: Electron.IpcRendererEvent, ...args: unknown[]) => void
 type IpcUnsubscribe = () => void
@@ -21,6 +21,6 @@ interface ElectronAPI {
 declare global {
   interface Window {
     electron: ElectronAPI
-    api: { webUtils: typeof webUtils }
+    api: { webUtils: { getPathForFile: (file: File) => string } }
   }
 }
