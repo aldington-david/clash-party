@@ -49,4 +49,9 @@ repository active so the scheduled workflow is not disabled for inactivity.
 Run `python .anytls/check.py` to check fork sources and release input validation.
 Run `python .anytls/test_release.py` for offline rejection tests, including stale
 recipes, unexpected downloads, mismatched build provenance, and incomplete drafts.
+The structural patch currently targets official v2.0.4. To check a fetched
+upstream commit before publishing, run `python .anytls/test_overlay_replay.py <ref>`.
+The build also runs `node .anytls/test_source_compat.mjs` against the patched tree:
+it checks mode migration and persistence, Electron 22 IPC ownership/cleanup, and
+the upstream one-time first-content signal without launching Electron.
 The production app is never run by these checks.

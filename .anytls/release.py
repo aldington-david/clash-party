@@ -84,7 +84,7 @@ def installers(version):
 def recipe_sha256():
     digest = hashlib.sha256()
     for name in ('.anytls/client.patch', '.anytls/overlay.py', '.anytls/check.py',
-                 '.anytls/release.py'):
+                 '.anytls/release.py', '.anytls/test_source_compat.mjs'):
         digest.update(name.encode() + b'\0' + (ROOT / name).read_bytes().replace(b'\r\n', b'\n'))
     return digest.hexdigest()
 

@@ -330,20 +330,20 @@ index 0cfb6bb..26241fe 100644
    { name: 'metadb', func: resolveMetadb, retry: 5 },
    { name: 'geosite', func: resolveGeosite, retry: 5 },
 diff --git a/src/main/config/app.ts b/src/main/config/app.ts
-index cd8bec4..6554ad3 100644
+index f788b08..3ebe12c 100644
 --- a/src/main/config/app.ts
 +++ b/src/main/config/app.ts
-@@ -35,6 +35,9 @@ export async function getAppConfig(force = false): Promise<IAppConfig> {
-       const data = await readFile(appConfigPath(), 'utf-8')
-       const parsedConfig = parse(data)
-       const mergedConfig = deepMerge(cloneDefaultConfig(), parsedConfig || {})
+@@ -40,6 +40,9 @@ export async function getAppConfig(force = false): Promise<IAppConfig> {
+         mergedConfig.modeSelected = true
+         mergedConfig.operationMode = 'standard'
+       }
 +      mergedConfig.enableSmartCore = false
 +      mergedConfig.enableSmartOverride = false
 +      if (mergedConfig.core !== 'mihomo-specific') mergedConfig.core = 'mihomo'
        mergedConfig.maxLogFileSize = normalizeMaxLogFileSizeMB(mergedConfig.maxLogFileSize)
        if (JSON.stringify(mergedConfig) !== JSON.stringify(parsedConfig)) {
          await atomicWriteFile(appConfigPath(), stringify(mergedConfig))
-@@ -71,6 +74,9 @@ async function writeAppConfig(
+@@ -76,6 +79,9 @@ async function writeAppConfig(
      if (replaceNameserverPolicy) {
        nextConfig.nameserverPolicy = patch.nameserverPolicy ?? {}
      }
@@ -706,7 +706,7 @@ index c2bffe2..7c27139 100644
        windowsHide: true,
        timeout: 3000,
 diff --git a/src/main/window.ts b/src/main/window.ts
-index 4e8c41e..813f27e 100644
+index ba04d92..a455bb2 100644
 --- a/src/main/window.ts
 +++ b/src/main/window.ts
 @@ -1,6 +1,6 @@
@@ -717,25 +717,14 @@ index 4e8c41e..813f27e 100644
  import { is } from '@electron-toolkit/utils'
  import icon from '../../resources/icon.png?asset'
  import { getAppConfig } from './config'
-@@ -107,24 +107,27 @@ let initialRendererReady = false
- 
- // 窗口在 renderer 首屏内容（路由 + 侧边栏）就绪后再显示，避免 lazy chunk 未加载完就展示空白主区。
- function waitForInitialContent(window: BrowserWindow): Promise<void> {
--  const { promise, resolve } = Promise.withResolvers<void>()
-+  let resolve!: () => void
-+  const promise = new Promise<void>((done) => {
-+    resolve = done
-+  })
-   const { webContents } = window
-   let finished = false
-   const finish = (): void => {
+@@ -117,17 +117,17 @@ function waitForInitialContent(window: BrowserWindow): Promise<void> {
      if (finished) return
      finished = true
      clearTimeout(timeout)
 -    webContents.off('ipc-message', onIpcMessage)
 +    ipcMain.off('rendererFirstContentReady', onIpcMessage)
      window.off('closed', onClosed)
-     resolve()
+     resolvePromise()
    }
 -  const onIpcMessage = (_event: IpcMainEvent, channel: string): void => {
 -    if (channel === 'rendererFirstContentReady') finish()
