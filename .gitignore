@@ -12,3 +12,10 @@ party.md
 CLAUDE.md
 agent.md
 tsconfig.node.tsbuildinfo
+.cache/
+build-source/
+release-assets/
+core-build-info.json
+release-notes.md
+__pycache__/
+.localpycache/

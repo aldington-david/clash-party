@@ -1,0 +1,14 @@
+{
+  "app_repository": "mihomo-party-org/clash-party",
+  "app_tag": "v2.0.4",
+  "upstream_commit": "ac294fed972c0c25c641abe603c3a6fe709dfdb3",
+  "core_repository": "aldington-david/mihomo",
+  "core_tag": "v1.19.34",
+  "core_sha": "aa2551ae4d72479551d63bb20b7130e0ad430d64",
+  "release_tag": "v2.0.4-anytls-v1.19.34-r2",
+  "fork_revision": 2,
+  "overlay_commit": "25b0c754e8f8fe97df2330fbd8fc57dad9f0952c",
+  "patch_sha256": "b19b933c5b054dad2306e6ea9467fd67076d77a6683e4cdedd6e0c76d7477066",
+  "recipe_sha256": "039715fdb7d9c8a9e4840d7da1473fd535304f27f0893022223c84cefa6019b4",
+  "macos_signing": "ad-hoc app / unsigned pkg, not notarized"
+}
