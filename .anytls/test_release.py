@@ -1,8 +1,11 @@
 """Offline checks for overlay drift and publication boundaries; no app or network access."""
 import copy
+import hashlib
 import json
+import os
 from pathlib import Path
 from subprocess import CompletedProcess
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -11,6 +14,24 @@ import release
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_checksums_include_the_sidecars_requested_by_installed_clients(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            names = release.installers('2.0.4')
+            inputs = names | {'build-info.json', 'latest.yml'}
+            for name in inputs:
+                (directory / name).write_bytes(('fixture: ' + name).encode())
+            release.write_checksums(directory)
+            sidecars = {name + '.sha256' for name in names}
+            self.assertEqual({p.name for p in directory.iterdir()}, inputs | sidecars | {'checksums.sha256'})
+            manifest = dict(line.split(maxsplit=1)[::-1]
+                            for line in (directory / 'checksums.sha256').read_text().splitlines())
+            self.assertEqual(set(manifest), inputs | sidecars)
+            for name in inputs | sidecars:
+                self.assertEqual(manifest[name], hashlib.sha256((directory / name).read_bytes()).hexdigest())
+            for name in names:
+                self.assertEqual((directory / (name + '.sha256')).read_text().strip().split()[0], manifest[name])
+
     def test_release_lookup_reads_drafts_and_public_releases_by_id(self):
         lookup = CompletedProcess([], 0, json.dumps({
             'apiUrl': 'https://api.github.com/repos/owner/repo/releases/123'
@@ -80,11 +101,34 @@ class ReleaseTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     release.verify_source_info(dict(info, **{key: 'old'}), 'v2.0.3', 'v1.19.32', 'core')
 
-    def test_publication_requires_all_nine_uploaded_nonempty_assets(self):
+    def test_prepare_checks_the_new_revision_without_modifying_the_previous_public_tag(self):
+        tag = 'v2.0.4-anytls-v1.19.34-r2'
+        names = release.installers('2.0.4')
+        current = {'draft': False, 'prerelease': False, 'assets': [
+            {'name': name, 'size': 1, 'state': 'uploaded'}
+            for name in names | {name + '.sha256' for name in names} | release.METADATA
+        ]}
+        responses = {
+            f'repos/{release.UPSTREAM}/releases/latest': {'tag_name': 'v2.0.4', 'draft': False, 'prerelease': False},
+            f'repos/{release.CORE}/releases/latest': {'tag_name': 'v1.19.34', 'draft': False, 'prerelease': False},
+            f'repos/{release.CORE}/git/ref/tags/v1.19.34': {'object': {'type': 'commit', 'sha': 'core'}},
+            f'repos/owner/repo/releases/tags/{tag}': current,
+        }
+        with patch.dict(os.environ, {'GITHUB_REPOSITORY': 'owner/repo'}), patch(
+            'release.api', side_effect=lambda path: responses[path]
+        ) as api, patch('release.run') as run, patch('release.output') as output:
+            release.prepare()
+            self.assertEqual(api.call_args_list[-1].args[0], f'repos/owner/repo/releases/tags/{tag}')
+            output.assert_called_once_with(build='false')
+            run.assert_not_called()
+
+    def test_publication_requires_all_fifteen_uploaded_nonempty_assets(self):
+        names = release.installers('2.0.3')
         good = {'draft': True, 'prerelease': False, 'assets': [
             {'name': name, 'size': 1, 'state': 'uploaded'}
-            for name in release.installers('2.0.3') | release.METADATA
+            for name in names | {name + '.sha256' for name in names} | release.METADATA
         ]}
+        self.assertEqual(len(good['assets']), 15)
         release.verify_release_assets(good, '2.0.3', draft=True)
         mutations = ('missing', 'extra', 'empty', 'pending', 'published')
         for mutation in mutations:

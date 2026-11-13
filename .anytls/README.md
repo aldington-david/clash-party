@@ -6,7 +6,7 @@ It uses only aldington-david/mihomo stable releases with the AnyTLS + REALITY pa
 The `anytls-reality` default branch owns the automation and `.anytls/client.patch`.
 Every hour at minute 27 (UTC), or on manual dispatch, the workflow checks the latest
 non-prerelease upstream app and custom core releases. A change in either creates
-`APP_TAG-anytls-CORE_TAG`. Existing public releases are never replaced.
+`APP_TAG-anytls-CORE_TAG-r2`. Existing public releases are never replaced.
 
 The workflow checks out the exact upstream app tag, applies the patch with
 `git apply --check`, pins the core tag, and pushes a source tag containing the
@@ -20,7 +20,14 @@ an outdated tag stops with an explicit recovery message instead of rebuilding ol
 sources. Published releases are never rebuilt by this maintenance check.
 
 Only Linux amd64/arm64 DEB, macOS arm64/x64 PKG, Windows x64 NSIS and Win7 x64 NSIS
-installers are published, plus `latest.yml`, `checksums.sha256`, and provenance.
+installers are published, each with a matching `<installer>.sha256` file, plus
+`latest.yml`, `checksums.sha256`, and provenance: fifteen assets in total.
+The sidecar files serve installed clients when the GitHub asset-digest API is
+unavailable. They use the same installer hashes as the combined checksum list;
+the list also covers the sidecars. The r2 suffix publishes this metadata repair
+without replacing the earlier app/core release. Installer names and app-version
+comparison stay unchanged, so an app already at the same version still uses the
+manual-download or in-app core-update paths described below.
 The macOS apps use ad-hoc signing; PKGs are unsigned and not notarized. Windows
 installers are unsigned. No upstream signing identity or certificates are used.
 Win7 follows upstream's Electron 22.3.27/CommonJS/sysproxy setup and uses the custom

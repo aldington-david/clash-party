@@ -15,6 +15,7 @@ from overlay import apply as apply_overlay, verify_download_sources
 ROOT = Path(__file__).resolve().parents[1]
 UPSTREAM = 'mihomo-party-org/clash-party'
 CORE = 'aldington-david/mihomo'
+FORK_REVISION = 2
 BUILD_CORES = {
     'linux-amd64': 'linux-amd64-compatible',
     'linux-arm64': 'linux-arm64',
@@ -90,7 +91,8 @@ def recipe_sha256():
 
 
 def verify_release_assets(release, version, *, draft=False):
-    expected = installers(version) | METADATA
+    names = installers(version)
+    expected = names | {name + '.sha256' for name in names} | METADATA
     assets = release['assets']
     if release['draft'] != draft or release.get('prerelease', False):
         raise ValueError('Release publication state changed; refusing to modify it')
@@ -120,6 +122,19 @@ def verify_builds(builds, info, core_assets):
             raise ValueError(f'Unexpected source or core binding for {build["build"]}')
 
 
+def write_checksums(directory):
+    sums = []
+    for path in sorted(directory.iterdir()):
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        sums.append(f'{digest}  {path.name}')
+        if path.suffix in ('.deb', '.pkg', '.exe'):
+            sidecar = path.name + '.sha256'
+            content = (digest + '\n').encode()
+            (directory / sidecar).write_bytes(content)
+            sums.append(f'{hashlib.sha256(content).hexdigest()}  {sidecar}')
+    (directory / 'checksums.sha256').write_text('\n'.join(sums) + '\n', encoding='utf-8', newline='\n')
+
+
 def output(**values):
     with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as file:
         for key, value in values.items():
@@ -135,7 +150,7 @@ def prepare():
         core_ref = api(f'repos/{CORE}/git/tags/{core_ref["sha"]}')['object']
     assert core_ref['type'] == 'commit'
     core_sha = core_ref['sha']
-    release_tag = f'{app_tag}-anytls-{core_tag}'
+    release_tag = f'{app_tag}-anytls-{core_tag}-r{FORK_REVISION}'
     release = api(f'repos/{repository}/releases/tags/{release_tag}')
     if release and not release['draft']:
         verify_release_assets(release, app_tag[1:])
@@ -170,7 +185,7 @@ def prepare():
         info = {
             'app_repository': UPSTREAM, 'app_tag': app_tag, 'upstream_commit': upstream_commit,
             'core_repository': CORE, 'core_tag': core_tag, 'core_sha': core_sha,
-            'release_tag': release_tag,
+            'release_tag': release_tag, 'fork_revision': FORK_REVISION,
             'overlay_commit': run('git', 'rev-parse', 'HEAD'),
             'patch_sha256': hashlib.sha256((ROOT / '.anytls/client.patch').read_bytes()).hexdigest(),
             'recipe_sha256': recipe_sha256(),
@@ -216,9 +231,7 @@ def publish():
              'See build-info.json and checksums.sha256 for source and asset provenance.\n')
     (directory / 'latest.yml').write_text(json.dumps({'version': version, 'changelog': notes}) + '\n')
     (ROOT / 'release-notes.md').write_text(notes)
-    paths = sorted(directory.iterdir())
-    sums = '\n'.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}' for p in paths)
-    (directory / 'checksums.sha256').write_text(sums + '\n')
+    write_checksums(directory)
     repository = os.environ['GITHUB_REPOSITORY']
     release = release_for_tag(repository, tag)
     if release and not release['draft']:
