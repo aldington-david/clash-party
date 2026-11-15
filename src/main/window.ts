@@ -1,6 +1,6 @@
 import { join } from 'path'
 import { readFileSync } from 'fs'
-import { BrowserWindow, Menu, screen, shell, type IpcMainEvent } from 'electron'
+import { BrowserWindow, Menu, screen, shell, ipcMain, type IpcMainEvent } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { getAppConfig } from './config'
@@ -117,17 +117,17 @@ function waitForInitialContent(window: BrowserWindow): Promise<void> {
     if (finished) return
     finished = true
     clearTimeout(timeout)
-    webContents.off('ipc-message', onIpcMessage)
+    ipcMain.off('rendererFirstContentReady', onIpcMessage)
     window.off('closed', onClosed)
     resolvePromise()
   }
-  const onIpcMessage = (_event: IpcMainEvent, channel: string): void => {
-    if (channel === 'rendererFirstContentReady') finish()
+  const onIpcMessage = (event: IpcMainEvent): void => {
+    if (event.sender === webContents) finish()
   }
   const onClosed = (): void => finish()
   // 内容就绪信号的兜底超时，避免 renderer 异常时窗口永不显示。
   const timeout = setTimeout(finish, 5000)
-  webContents.on('ipc-message', onIpcMessage)
+  ipcMain.on('rendererFirstContentReady', onIpcMessage)
   window.once('closed', onClosed)
   return promise
 }

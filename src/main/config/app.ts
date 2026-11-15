@@ -40,6 +40,9 @@ export async function getAppConfig(force = false): Promise<IAppConfig> {
         mergedConfig.modeSelected = true
         mergedConfig.operationMode = 'standard'
       }
+      mergedConfig.enableSmartCore = false
+      mergedConfig.enableSmartOverride = false
+      if (mergedConfig.core !== 'mihomo-specific') mergedConfig.core = 'mihomo'
       mergedConfig.maxLogFileSize = normalizeMaxLogFileSizeMB(mergedConfig.maxLogFileSize)
       if (JSON.stringify(mergedConfig) !== JSON.stringify(parsedConfig)) {
         await atomicWriteFile(appConfigPath(), stringify(mergedConfig))
@@ -76,6 +79,9 @@ async function writeAppConfig(
     if (replaceNameserverPolicy) {
       nextConfig.nameserverPolicy = patch.nameserverPolicy ?? {}
     }
+    nextConfig.enableSmartCore = false
+    nextConfig.enableSmartOverride = false
+    if (nextConfig.core !== 'mihomo-specific') nextConfig.core = 'mihomo'
     nextConfig.maxLogFileSize = normalizeMaxLogFileSizeMB(nextConfig.maxLogFileSize)
     try {
       await atomicWriteFile(appConfigPath(), stringify(nextConfig))

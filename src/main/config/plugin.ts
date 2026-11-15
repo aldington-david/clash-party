@@ -7,7 +7,7 @@ let pluginConfig: IPluginConfig | undefined
 const writeQueue = new WriteQueue()
 
 // 插件记录的调度默认值：安装时写入 interval；autoUpdate 缺省视为开启
-export const DEFAULT_PLUGIN_INTERVAL_MIN = 1440 // 24h
+export const DEFAULT_PLUGIN_INTERVAL_MIN = 360 // 6h
 
 // profile 侧的调度字段以插件记录为准；这里是唯一的解析点（缺省值只在此处出现）
 export function pluginSchedule(item?: IPluginItem): { interval: number; autoUpdate: boolean } {

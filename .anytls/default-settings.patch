@@ -1,0 +1,464 @@
+diff --git a/electron-builder.yml b/electron-builder.yml
+index 2ed79e8..afe019c 100644
+--- a/electron-builder.yml
++++ b/electron-builder.yml
+@@ -23,6 +23,8 @@ asarUnpack:
+ extraResources:
+   - from: './extra/'
+     to: ''
++  - from: './resources/themes/homohub.css'
++    to: 'files/homohub.css'
+ protocols:
+   name: 'Clash Party URI Scheme'
+   schemes:
+diff --git a/resources/themes/homohub.css b/resources/themes/homohub.css
+new file mode 100644
+index 0000000..e650f11
+--- /dev/null
++++ b/resources/themes/homohub.css
+@@ -0,0 +1,137 @@
++/* HomoHub */
++
++.side .sticky h3 {
++    white-space: nowrap;
++}
++
++.side .sticky h3::after {
++    content: "Party";
++    padding: 4px;
++    margin-left: calc(-5ch + 4px);
++    color: hsl(var(--heroui-primary-foreground));
++    background-color: hsl(var(--heroui-primary));
++    border-radius: var(--heroui-radius-small);
++}
++
++.border-primary-foreground>.bg-white {
++    background-color: hsl(var(--heroui-primary-foreground));
++}
++
++html {
++    --heroui-background: 0 0% 0% !important;
++    --heroui-foreground-50: 240 5.88% 10% !important;
++    --heroui-foreground-100: 240 3.7% 15.88% !important;
++    --heroui-foreground-200: 240 5.26% 26.08% !important;
++    --heroui-foreground-300: 240 5.2% 33.92% !important;
++    --heroui-foreground-400: 240 3.83% 46.08% !important;
++    --heroui-foreground-500: 240 5.03% 64.9% !important;
++    --heroui-foreground-600: 240 4.88% 83.92% !important;
++    --heroui-foreground-700: 240 5.88% 90% !important;
++    --heroui-foreground-800: 240 4.76% 95.88% !important;
++    --heroui-foreground-900: 0 0% 98.04% !important;
++    --heroui-foreground: 210 5.56% 92.94% !important;
++    --heroui-focus: 212.01999999999998 100% 46.67% !important;
++    --heroui-overlay: 0 0% 0% !important;
++    --heroui-divider: 0 0% 100% !important;
++    --heroui-divider-opacity: 0.15 !important;
++    --heroui-content1: 240 5.88% 10% !important;
++    --heroui-content1-foreground: 0 0% 98.04% !important;
++    --heroui-content2: 240 3.7% 15.88% !important;
++    --heroui-content2-foreground: 240 4.76% 95.88% !important;
++    --heroui-content3: 240 5.26% 26.08% !important;
++    --heroui-content3-foreground: 240 5.88% 90% !important;
++    --heroui-content4: 240 5.2% 33.92% !important;
++    --heroui-content4-foreground: 240 4.88% 83.92% !important;
++    --heroui-default-50: 240 5.88% 10% !important;
++    --heroui-default-100: 240 3.7% 15.88% !important;
++    --heroui-default-200: 240 5.26% 26.08% !important;
++    --heroui-default-300: 240 5.2% 33.92% !important;
++    --heroui-default-400: 240 3.83% 46.08% !important;
++    --heroui-default-500: 240 5.03% 64.9% !important;
++    --heroui-default-600: 240 4.88% 83.92% !important;
++    --heroui-default-700: 240 5.88% 90% !important;
++    --heroui-default-800: 240 4.76% 95.88% !important;
++    --heroui-default-900: 0 0% 98.04% !important;
++    --heroui-default-foreground: 0 0% 100% !important;
++    --heroui-default: 240 5.26% 26.08% !important;
++    --heroui-primary-50: 36 100% 50% !important;
++    --heroui-primary-100: 36 100% 50% !important;
++    --heroui-primary-200: 36 100% 50% !important;
++    --heroui-primary-300: 36 100% 50% !important;
++    --heroui-primary-400: 36 100% 50% !important;
++    --heroui-primary-500: 36 100% 50% !important;
++    --heroui-primary-600: 36 100% 50% !important;
++    --heroui-primary-700: 36 100% 50% !important;
++    --heroui-primary-800: 36 100% 50% !important;
++    --heroui-primary-900: 36 100% 50% !important;
++    --heroui-primary-foreground: 0 0% 0% !important;
++    --heroui-primary: 36 100% 50% !important;
++    --heroui-secondary-50: 270 66.67% 9.41% !important;
++    --heroui-secondary-100: 270 66.67% 18.82% !important;
++    --heroui-secondary-200: 270 66.67% 28.24% !important;
++    --heroui-secondary-300: 270 66.67% 37.65% !important;
++    --heroui-secondary-400: 270 66.67% 47.06% !important;
++    --heroui-secondary-500: 270 59.26% 57.65% !important;
++    --heroui-secondary-600: 270 59.26% 68.24% !important;
++    --heroui-secondary-700: 270 59.26% 78.82% !important;
++    --heroui-secondary-800: 270 59.26% 89.41% !important;
++    --heroui-secondary-900: 270 61.54% 94.9% !important;
++    --heroui-secondary-foreground: 0 0% 100% !important;
++    --heroui-secondary: 270 59.26% 57.65% !important;
++    --heroui-success-50: 145.71000000000004 77.78% 8.82% !important;
++    --heroui-success-100: 146.2 79.78% 17.45% !important;
++    --heroui-success-200: 145.78999999999996 79.26% 26.47% !important;
++    --heroui-success-300: 146.01 79.89% 35.1% !important;
++    --heroui-success-400: 145.96000000000004 79.46% 43.92% !important;
++    --heroui-success-500: 146.01 62.45% 55.1% !important;
++    --heroui-success-600: 145.78999999999996 62.57% 66.47% !important;
++    --heroui-success-700: 146.2 61.74% 77.45% !important;
++    --heroui-success-800: 145.71000000000004 61.4% 88.82% !important;
++    --heroui-success-900: 146.66999999999996 64.29% 94.51% !important;
++    --heroui-success-foreground: 0 0% 0% !important;
++    --heroui-success: 145.96000000000004 79.46% 43.92% !important;
++    --heroui-warning-50: 36 100% 50% !important;
++    --heroui-warning-100: 36 100% 50% !important;
++    --heroui-warning-200: 36 100% 50% !important;
++    --heroui-warning-300: 36 100% 50% !important;
++    --heroui-warning-400: 36 100% 50% !important;
++    --heroui-warning-500: 36 100% 50% !important;
++    --heroui-warning-600: 36 100% 50% !important;
++    --heroui-warning-700: 36 100% 50% !important;
++    --heroui-warning-800: 36 100% 50% !important;
++    --heroui-warning-900: 36 100% 50% !important;
++    --heroui-warning-foreground: 0 0% 0% !important;
++    --heroui-warning: 36 100% 50% !important;
++    --heroui-danger-50: 7 72% 60% !important;
++    --heroui-danger-100: 7 72% 60% !important;
++    --heroui-danger-200: 7 72% 60% !important;
++    --heroui-danger-300: 7 72% 60% !important;
++    --heroui-danger-400: 7 72% 60% !important;
++    --heroui-danger-500: 7 72% 60% !important;
++    --heroui-danger-600: 7 72% 60% !important;
++    --heroui-danger-700: 7 72% 60% !important;
++    --heroui-danger-800: 7 72% 60% !important;
++    --heroui-danger-900: 7 72% 60% !important;
++    --heroui-danger-foreground: 0 0% 100% !important;
++    --heroui-danger: 7 72% 60% !important;
++    --heroui-divider-weight: 1px !important;
++    --heroui-disabled-opacity: .5 !important;
++    --heroui-font-size-tiny: 0.75rem !important;
++    --heroui-font-size-small: 0.875rem !important;
++    --heroui-font-size-medium: 1rem !important;
++    --heroui-font-size-large: 1.125rem !important;
++    --heroui-line-height-tiny: 1rem !important;
++    --heroui-line-height-small: 1.25rem !important;
++    --heroui-line-height-medium: 1.5rem !important;
++    --heroui-line-height-large: 1.75rem !important;
++    --heroui-radius-small: 8px !important;
++    --heroui-radius-medium: 12px !important;
++    --heroui-radius-large: 14px !important;
++    --heroui-border-width-small: 1px !important;
++    --heroui-border-width-medium: 2px !important;
++    --heroui-border-width-large: 3px !important;
++    --heroui-box-shadow-small: 0px 0px 5px 0px rgb(0 0 0 / 0.05), 0px 2px 10px 0px rgb(0 0 0 / 0.2), inset 0px 0px 1px 0px rgb(255 255 255 / 0.15) !important;
++    --heroui-box-shadow-medium: 0px 0px 15px 0px rgb(0 0 0 / 0.06), 0px 2px 30px 0px rgb(0 0 0 / 0.22), inset 0px 0px 1px 0px rgb(255 255 255 / 0.15) !important;
++    --heroui-box-shadow-large: 0px 0px 30px 0px rgb(0 0 0 / 0.07), 0px 30px 60px 0px rgb(0 0 0 / 0.26), inset 0px 0px 1px 0px rgb(255 255 255 / 0.15) !important;
++    --heroui-hover-opacity: .9 !important;
++}
+diff --git a/src/main/utils/init.ts b/src/main/utils/init.ts
+index cde78c5..49dd8e2 100644
+--- a/src/main/utils/init.ts
++++ b/src/main/utils/init.ts
+@@ -137,6 +137,15 @@ async function initDirs(): Promise<void> {
+   )
+ }
+
++async function initBundledTheme(): Promise<void> {
++  const target = path.join(themesDir(), 'homohub.css')
++  if (existsSync(target)) return
++  const source = app.isPackaged
++    ? path.join(resourcesFilesDir(), 'homohub.css')
++    : path.join(app.getAppPath(), 'resources/themes/homohub.css')
++  await cp(source, target, { force: false })
++}
++
+ async function initConfig(): Promise<void> {
+   const configs = [
+     { path: appConfigPath(), content: defaultConfig, name: 'app config' },
+@@ -455,6 +464,7 @@ export async function initBasic(): Promise<void> {
+
+   initBasicPromise = (async () => {
+     await initDirs()
++    await initBundledTheme()
+     await initConfig()
+     await migration()
+     await migrateSubStoreFiles()
+diff --git a/src/main/utils/template.ts b/src/main/utils/template.ts
+index 67a6089..2ec7200 100644
+--- a/src/main/utils/template.ts
++++ b/src/main/utils/template.ts
+@@ -23,10 +23,10 @@ export const defaultConfig: IAppConfig = {
+   enableSmartOverride: true,
+   smartCoreUseLightGBM: false,
+   smartCoreCollectData: false,
+-  silentStart: false,
++  silentStart: true,
+   appTheme: 'system',
+   useWindowFrame: false,
+-  proxyInTray: true,
++  proxyInTray: false,
+   showCurrentProxyInTray: false,
+   enableTrafficLogger: DEFAULT_ENABLE_TRAFFIC_LOGGER,
+   trayProxyGroupStyle: 'default',
+@@ -45,12 +45,12 @@ export const defaultConfig: IAppConfig = {
+   autoQuitWithoutCore: false,
+   autoQuitWithoutCoreDelay: 60,
+   autoQuitWithoutCoreMode: 'core',
+-  proxyDisplayMode: 'simple',
++  proxyDisplayMode: 'full',
+   proxyDisplayOrder: 'default',
+   autoCheckUpdate: true,
+   autoUpdateProfileOnStart: true,
+   silentUpdate: true,
+-  autoCloseConnection: true,
++  autoCloseConnection: false,
+   autoCloseConnectionOnlyGroup: false,
+   subscriptionTimeout: 30000,
+   gistAgeEncrypt: false,
+@@ -69,7 +69,7 @@ export const defaultConfig: IAppConfig = {
+   siderOrder: DEFAULT_SIDER_ORDER,
+   lastSelectedSiderCard: 'proxy',
+   siderWidth: 250,
+-  sysProxy: { enable: false, mode: 'manual' },
++  sysProxy: { enable: false, mode: 'auto' },
+   triggerMainWindowBehavior: 'show',
+   showMixedPort: DEFAULT_MIHOMO_PORTS.mixed,
+   enableMixedPort: true,
+@@ -84,7 +84,12 @@ export const defaultConfig: IAppConfig = {
+   testProfileOnStart: true,
+   coreStartupMode: 'log',
+   useHotReloadProfile: false,
+-  hotReloadProfileAutoCloseConnection: false
++  hotReloadProfileAutoCloseConnection: false,
++  profileDisplayDate: 'update',
++  dnsCardStatus: 'hidden',
++  sniffCardStatus: 'hidden',
++  mihomoCpuPriority: 'PRIORITY_ABOVE_NORMAL',
++  customTheme: 'homohub.css'
+ }
+
+ export const defaultControledMihomoConfig: Partial<IMihomoConfig> = {
+@@ -100,8 +105,8 @@ export const defaultControledMihomoConfig: Partial<IMihomoConfig> = {
+   'tproxy-port': DEFAULT_MIHOMO_PORTS.tproxy,
+   'allow-lan': false,
+   'unified-delay': true,
+-  'tcp-concurrent': false,
+-  'log-level': 'info',
++  'tcp-concurrent': true,
++  'log-level': 'silent',
+   'find-process-mode': 'strict',
+   'bind-address': '*',
+   'lan-allowed-ips': DEFAULT_MIHOMO_LAN_ALLOWED_IPS,
+@@ -118,7 +123,7 @@ export const defaultControledMihomoConfig: Partial<IMihomoConfig> = {
+     'store-selected': true,
+     'store-fake-ip': true
+   },
+-  'geo-auto-update': false,
++  'geo-auto-update': true,
+   'geo-update-interval': 24,
+   // Smart 内核自带的 LightGBM 模型更新器，默认值与内核一致（关闭 / 72 小时 /
+   // 空地址即用内核内置地址）。非 Smart 内核会忽略这几个键。
+diff --git a/src/shared/appConfig.ts b/src/shared/appConfig.ts
+index a80b43f..a60f25c 100644
+--- a/src/shared/appConfig.ts
++++ b/src/shared/appConfig.ts
+@@ -1,6 +1,6 @@
+ export const DEFAULT_CONTROL_DNS = false
+
+-export const DEFAULT_CONTROL_SNIFF = true
++export const DEFAULT_CONTROL_SNIFF = false
+
+ export const DEFAULT_USE_NAMESERVER_POLICY = false
+
+@@ -8,7 +8,7 @@ export const DEFAULT_NAMESERVER_POLICY: IAppConfig['nameserverPolicy'] = {}
+
+ export const DEFAULT_ENABLE_TRAFFIC_LOGGER = true
+
+-export const DEFAULT_USE_SUB_STORE = true
++export const DEFAULT_USE_SUB_STORE = false
+
+ export const DEFAULT_SIDER_ORDER: SiderCardKey[] = [
+   'sysproxy',
+@@ -49,6 +49,7 @@ export function getDefaultMihomoTunDevice(platform: NodeJS.Platform | string): s
+ type DefaultMihomoTunConfig = {
+   enable: boolean
+   stack: TunStack
++  'strict-route': boolean
+   'auto-route': boolean
+   'auto-redirect': boolean
+   'auto-detect-interface': boolean
+@@ -59,7 +60,8 @@ type DefaultMihomoTunConfig = {
+
+ export const DEFAULT_MIHOMO_TUN_CONFIG: DefaultMihomoTunConfig = {
+   enable: false,
+-  stack: 'mixed',
++  stack: 'mips',
++  'strict-route': true,
+   'auto-route': true,
+   'auto-redirect': false,
+   'auto-detect-interface': true,
+diff --git a/src/main/config/plugin.ts b/src/main/config/plugin.ts
+index 8e819c1..f4866e6 100644
+--- a/src/main/config/plugin.ts
++++ b/src/main/config/plugin.ts
+@@ -7,7 +7,7 @@ let pluginConfig: IPluginConfig | undefined
+ const writeQueue = new WriteQueue()
+
+ // 插件记录的调度默认值：安装时写入 interval；autoUpdate 缺省视为开启
+-export const DEFAULT_PLUGIN_INTERVAL_MIN = 1440 // 24h
++export const DEFAULT_PLUGIN_INTERVAL_MIN = 360 // 6h
+
+ // profile 侧的调度字段以插件记录为准；这里是唯一的解析点（缺省值只在此处出现）
+ export function pluginSchedule(item?: IPluginItem): { interval: number; autoUpdate: boolean } {
+diff --git a/src/main/config/profile.test.ts b/src/main/config/profile.test.ts
+index 65228fc..2df8e84 100644
+--- a/src/main/config/profile.test.ts
++++ b/src/main/config/profile.test.ts
+@@ -615,3 +615,72 @@ describe('plugin subscription validation follow-ups (V7 regressions)', () => {
+     })
+   })
+ })
++
++describe('new remote subscription schedule defaults', () => {
++  it('uses six hours even when the first response recommends another interval', async () => {
++    mocks.axiosGet.mockResolvedValue({
++      status: 200,
++      data: newProfile,
++      headers: { 'profile-update-interval': '24' }
++    })
++    const item = await createProfile({ type: 'remote', url: 'https://example.test/subscription' })
++    expect(item).toMatchObject({ autoUpdate: true, interval: 360, allowFixedInterval: true })
++  })
++
++  it('uses six hours without a response interval', async () => {
++    const item = await createProfile({ type: 'remote', url: 'https://example.test/subscription' })
++    expect(item).toMatchObject({ autoUpdate: true, interval: 360, allowFixedInterval: true })
++  })
++
++  it('retains an explicit disabled switch and fixed interval', async () => {
++    mocks.axiosGet.mockResolvedValue({
++      status: 200,
++      data: newProfile,
++      headers: { 'profile-update-interval': '24' }
++    })
++    const item = await createProfile({
++      type: 'remote',
++      url: 'https://example.test/subscription',
++      autoUpdate: false,
++      interval: 90,
++      allowFixedInterval: true
++    })
++    expect(item).toMatchObject({ autoUpdate: false, interval: 90, allowFixedInterval: true })
++  })
++
++  it('retains the explicit choice to follow the response interval', async () => {
++    mocks.axiosGet.mockResolvedValue({
++      status: 200,
++      data: newProfile,
++      headers: { 'profile-update-interval': '12' }
++    })
++    const item = await createProfile({
++      id: 'remote',
++      type: 'remote',
++      url: 'https://example.test/subscription',
++      autoUpdate: false,
++      interval: 60,
++      allowFixedInterval: false
++    })
++    expect(item).toMatchObject({ autoUpdate: false, interval: 720, allowFixedInterval: false })
++  })
++
++  it('retains zero or missing intervals on existing subscriptions and local files', async () => {
++    const item = await createProfile({
++      id: 'remote',
++      type: 'remote',
++      url: 'https://example.test/subscription',
++      interval: 0,
++      autoUpdate: false
++    })
++    expect(item).toMatchObject({ interval: 0, autoUpdate: false, allowFixedInterval: false })
++    const legacy = await createProfile({
++      id: 'remote',
++      type: 'remote',
++      url: 'https://example.test/subscription'
++    })
++    expect(legacy.interval).toBe(0)
++    const local = await createProfile({ type: 'local', file: newProfile })
++    expect(local).toMatchObject({ interval: 0, allowFixedInterval: false })
++  })
++})
+diff --git a/src/main/config/profile.ts b/src/main/config/profile.ts
+index 288f09e..8b49ee8 100644
+--- a/src/main/config/profile.ts
++++ b/src/main/config/profile.ts
+@@ -514,16 +514,17 @@ async function fetchAndValidateSubscription(options: FetchOptions): Promise<Fetc
+
+ export async function createProfile(item: Partial<IProfileItem>): Promise<IProfileItem> {
+   const id = item.id || new Date().getTime().toString(16)
++  const isNewRemote = item.type === 'remote' && !item.id
+   const newItem: IProfileItem = {
+     id,
+     name: item.name || (item.type === 'remote' ? 'Remote File' : 'Local File'),
+     type: item.type || 'local',
+     url: item.url,
+     substore: item.substore || false,
+-    interval: item.interval || 0,
++    interval: item.interval ?? (isNewRemote ? 360 : 0),
+     override: item.override || [],
+     useProxy: item.useProxy || false,
+-    allowFixedInterval: item.allowFixedInterval || false,
++    allowFixedInterval: item.allowFixedInterval ?? isNewRemote,
+     autoUpdate: item.autoUpdate ?? true,
+     authToken: item.authToken,
+     userAgent: item.userAgent,
+@@ -607,7 +608,7 @@ export async function createProfile(item: Partial<IProfileItem>): Promise<IProfi
+     if (headers['profile-web-page-url']) {
+       newItem.home = headers['profile-web-page-url']
+     }
+-    if (headers['profile-update-interval'] && !item.allowFixedInterval) {
++    if (headers['profile-update-interval'] && !newItem.allowFixedInterval) {
+       const hours = Number(headers['profile-update-interval'])
+       if (Number.isFinite(hours) && hours > 0) {
+         newItem.interval = Math.min(Math.ceil(hours * 60), MAX_PROFILE_INTERVAL_MINUTES)
+diff --git a/src/main/core/profileUpdater.test.ts b/src/main/core/profileUpdater.test.ts
+index 5779cc1..da1ad1e 100644
+--- a/src/main/core/profileUpdater.test.ts
++++ b/src/main/core/profileUpdater.test.ts
+@@ -22,6 +22,8 @@ vi.mock('../resolve/plugin', () => ({
+   updatePluginProfile: mocks.updatePluginProfile
+ }))
+
++vi.mock('../window', () => ({ mainWindow: null }))
++
+ vi.mock('../utils/logger', () => ({
+   logger: { warn: vi.fn() }
+ }))
+@@ -96,3 +98,29 @@ describe('initProfileUpdater', () => {
+     expect(mocks.addProfileItem).toHaveBeenCalledWith(remoteProfile)
+   })
+ })
++
++describe('six-hour subscription timer', () => {
++  it('refreshes an enabled remote subscription after 360 minutes', async () => {
++    vi.useFakeTimers()
++    const { addProfileUpdater, removeProfileUpdater } = await import('./profileUpdater')
++    const item = {
++      id: 'six-hour',
++      type: 'remote' as const,
++      name: 'Remote',
++      autoUpdate: true,
++      interval: 360
++    }
++    mocks.getProfileItem.mockResolvedValue(item)
++    mocks.addProfileItem.mockClear()
++    try {
++      await addProfileUpdater(item)
++      await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000 - 1)
++      expect(mocks.addProfileItem).not.toHaveBeenCalled()
++      await vi.advanceTimersByTimeAsync(1)
++      expect(mocks.addProfileItem).toHaveBeenCalledOnce()
++    } finally {
++      await removeProfileUpdater(item.id)
++      vi.useRealTimers()
++    }
++  })
++})

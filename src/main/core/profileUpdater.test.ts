@@ -22,6 +22,8 @@ vi.mock('../resolve/plugin', () => ({
   updatePluginProfile: mocks.updatePluginProfile
 }))
 
+vi.mock('../window', () => ({ mainWindow: null }))
+
 vi.mock('../utils/logger', () => ({
   logger: { warn: vi.fn() }
 }))
@@ -94,5 +96,31 @@ describe('initProfileUpdater', () => {
     await initProfileUpdater()
 
     expect(mocks.addProfileItem).toHaveBeenCalledWith(remoteProfile)
+  })
+})
+
+describe('six-hour subscription timer', () => {
+  it('refreshes an enabled remote subscription after 360 minutes', async () => {
+    vi.useFakeTimers()
+    const { addProfileUpdater, removeProfileUpdater } = await import('./profileUpdater')
+    const item = {
+      id: 'six-hour',
+      type: 'remote' as const,
+      name: 'Remote',
+      autoUpdate: true,
+      interval: 360
+    }
+    mocks.getProfileItem.mockResolvedValue(item)
+    mocks.addProfileItem.mockClear()
+    try {
+      await addProfileUpdater(item)
+      await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000 - 1)
+      expect(mocks.addProfileItem).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(mocks.addProfileItem).toHaveBeenCalledOnce()
+    } finally {
+      await removeProfileUpdater(item.id)
+      vi.useRealTimers()
+    }
   })
 })
