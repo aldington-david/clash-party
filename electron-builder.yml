@@ -9,6 +9,9 @@ files:
   - '!images/*'
   - '!scripts/*'
   - '!extra/*'
+  - '!.anytls/*'
+  - '!.anytls-build.json'
+  - '!core-build-info.json'
   - '!tailwind.config.js'
   - '!postcss.config.js'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
@@ -20,6 +23,8 @@ asarUnpack:
 extraResources:
   - from: './extra/'
     to: ''
+  - from: './resources/themes/homohub.css'
+    to: 'files/homohub.css'
 protocols:
   name: 'Clash Party URI Scheme'
   schemes:
@@ -34,7 +39,6 @@ fileAssociations:
 win:
   target:
     - nsis
-    - 7z
   artifactName: clash-party-windows-${version}-${arch}-portable.${ext}
 nsis:
   artifactName: clash-party-windows-${version}-${arch}-setup.${ext}
@@ -50,7 +54,8 @@ mac:
     - from: './build/pkg-scripts/party.mihomo.helper.plist'
       to: 'files/party.mihomo.helper.plist'
   entitlementsInherit: build/entitlements.mac.plist
-  hardenedRuntime: true
+  identity: '-'
+  hardenedRuntime: false
   gatekeeperAssess: false
   extendInfo:
     - NSCameraUsageDescription: Application requests access to the device's camera.
@@ -80,8 +85,6 @@ linux:
       Icon: mihomo-party
   target:
     - deb
-    - rpm
-    - pacman
   maintainer: mihomo-party-org
   category: Utility
   artifactName: clash-party-linux-${version}-${arch}.${ext}

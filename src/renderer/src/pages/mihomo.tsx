@@ -367,6 +367,7 @@ const Mihomo: React.FC = () => {
             <SettingItem title={t('mihomo.enableSmartCore')} divider>
               <Switch
                 size="sm"
+                isDisabled
                 isSelected={enableSmartCore}
                 color={enableSmartCore ? 'primary' : 'default'}
                 onValueChange={async (v) => {
@@ -482,11 +483,7 @@ const Mihomo: React.FC = () => {
                   }
                 }}
               >
-                <SelectItem key="mihomo">{t(CoreMap['mihomo'])}</SelectItem>
-                <SelectItem key="mihomo-alpha">{t(CoreMap['mihomo-alpha'])}</SelectItem>
-                {enableSmartCore ? (
-                  <SelectItem key="mihomo-smart">{t(CoreMap['mihomo-smart'])}</SelectItem>
-                ) : null}
+                <SelectItem key="mihomo">AnyTLS + REALITY</SelectItem>
                 <SelectItem key="mihomo-specific">{t(CoreMap['mihomo-specific'])}</SelectItem>
               </Select>
             </SettingItem>
