@@ -102,7 +102,7 @@ class ReleaseTests(unittest.TestCase):
                     release.verify_source_info(dict(info, **{key: 'old'}), 'v2.0.3', 'v1.19.32', 'core')
 
     def test_prepare_checks_the_new_revision_without_modifying_the_previous_public_tag(self):
-        tag = 'v2.0.4-anytls-v1.19.34-r2'
+        tag = f'v2.0.4-anytls-v1.19.34-r{release.FORK_REVISION}'
         names = release.installers('2.0.4')
         current = {'draft': False, 'prerelease': False, 'assets': [
             {'name': name, 'size': 1, 'state': 'uploaded'}

@@ -146,6 +146,9 @@ jobs:
           import json, os, pathlib, shutil, subprocess
           out = pathlib.Path('release-assets')
           out.mkdir()
+          theme = pathlib.Path('resources/themes/homohub.css').read_bytes()
+          packaged_themes = [p for p in pathlib.Path('dist').rglob('homohub.css') if p.parent.name == 'files']
+          assert packaged_themes and all(p.read_bytes() == theme for p in packaged_themes), 'Packaged HomoHub theme is missing or changed'
           files = [p for p in pathlib.Path('dist').iterdir() if p.suffix in ('.deb', '.pkg', '.exe')]
           assert len(files) == 1, files
           shutil.copy2(files[0], out / files[0].name)

@@ -6,7 +6,7 @@ It uses only aldington-david/mihomo stable releases with the AnyTLS + REALITY pa
 The `anytls-reality` default branch owns the automation and `.anytls/client.patch`.
 Every hour at minute 27 (UTC), or on manual dispatch, the workflow checks the latest
 non-prerelease upstream app and custom core releases. A change in either creates
-`APP_TAG-anytls-CORE_TAG-r2`. Existing public releases are never replaced.
+`APP_TAG-anytls-CORE_TAG-r3`. Existing public releases are never replaced.
 
 The workflow checks out the exact upstream app tag, applies the patch with
 `git apply --check`, pins the core tag, and pushes a source tag containing the
@@ -56,9 +56,30 @@ repository active so the scheduled workflow is not disabled for inactivity.
 Run `python .anytls/check.py` to check fork sources and release input validation.
 Run `python .anytls/test_release.py` for offline rejection tests, including stale
 recipes, unexpected downloads, mismatched build provenance, and incomplete drafts.
-The structural patch currently targets official v2.0.4. To check a fetched
+The structural patches currently target official v2.0.4. To check a fetched
 upstream commit before publishing, run `python .anytls/test_overlay_replay.py <ref>`.
 The build also runs `node .anytls/test_source_compat.mjs` against the patched tree:
 it checks mode migration and persistence, Electron 22 IPC ownership/cleanup, and
 the upstream one-time first-content signal without launching Electron.
 The production app is never run by these checks.
+
+## Initial settings in revision 3
+
+`default-settings.patch` follows the existing client patch. It changes the sixteen
+approved parameters: silent startup on; tray proxy information off; Sub-Store off;
+automatic connection closing off; detailed proxy information; subscription update
+dates; hidden DNS and sniff cards; above-normal Windows core priority; PAC mode;
+TCP concurrency and Geo updates on; silent runtime logs; Mips TUN stack; strict
+routing on; and client sniff overriding off. DNS overriding remains off. With
+both override controls off, subscriptions retain their DNS, hosts and sniff settings.
+
+The connection view remains a list in ascending order, LAN access remains off,
+and kernel IPv6 remains on. TUN and system proxy remain off until manually enabled.
+The platform-specific TUN device names and proxy bypass lists are unchanged.
+Explicit saved settings retain priority over the new defaults.
+
+HomoHub CSS is bundled offline and becomes the default theme. Basic initialization
+copies it before the first window render only when the user's theme file is absent;
+existing same-name CSS is retained. Development resolves the tracked source asset,
+while packaged builds use the bundled resource. CI exercises both paths and checks
+the theme in all six packaged applications before installer publication.

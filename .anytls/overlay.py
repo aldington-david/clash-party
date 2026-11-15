@@ -4,6 +4,7 @@ import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
+PATCHES = ('client.patch', 'default-settings.patch')
 LITERALS = (
     ('src/main/utils/ipc.ts', "'MetaCubeX', 'mihomo'", "'aldington-david', 'mihomo'", 3),
     ('src/main/utils/github.ts', 'https://github.com/MetaCubeX/mihomo/releases/download/',
@@ -73,7 +74,8 @@ def verify_download_sources(source):
 def apply(source):
     source = Path(source)
     apply_literals(source)
-    patch = str(ROOT / '.anytls/client.patch')
-    subprocess.run(['git', 'apply', '--check', patch], cwd=source, check=True)
-    subprocess.run(['git', 'apply', patch], cwd=source, check=True)
+    for name in PATCHES:
+        patch = str(ROOT / '.anytls' / name)
+        subprocess.run(['git', 'apply', '--check', patch], cwd=source, check=True)
+        subprocess.run(['git', 'apply', patch], cwd=source, check=True)
     verify_download_sources(source)

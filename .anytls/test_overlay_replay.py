@@ -7,13 +7,13 @@ import sys
 import tempfile
 import zipfile
 
-from overlay import apply, LITERALS
+from overlay import apply, LITERALS, PATCHES
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def replay(ref):
-    patch = (ROOT / '.anytls/client.patch').read_text(encoding='utf-8')
+    patch = '\n'.join((ROOT / '.anytls' / name).read_text(encoding='utf-8') for name in PATCHES)
     required = set(re.findall(r'^\+\+\+ b/(.+)$', patch, re.MULTILINE))
     required.update(name for name, *_ in LITERALS)
     tracked = set(subprocess.check_output([
