@@ -15,7 +15,7 @@ from overlay import apply as apply_overlay, verify_download_sources
 ROOT = Path(__file__).resolve().parents[1]
 UPSTREAM = 'mihomo-party-org/clash-party'
 CORE = 'aldington-david/mihomo'
-FORK_REVISION = 3
+FORK_REVISION = 4
 BUILD_CORES = {
     'linux-amd64': 'linux-amd64-compatible',
     'linux-arm64': 'linux-arm64',

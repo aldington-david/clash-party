@@ -413,3 +413,23 @@ try {
 console.log(
   'Approved defaults, stored choices, DNS/sniff inheritance and offline theme checks passed'
 )
+
+const pluginDefaults = loadModule('src/main/config/plugin.ts', {
+  fs: {},
+  '../utils/dirs': {},
+  '../utils/safeFile': { WriteQueue: queue },
+  '../utils/yaml': {}
+})
+assert.equal(pluginDefaults.DEFAULT_PLUGIN_INTERVAL_MIN, 360)
+assert.deepEqual(clone(pluginDefaults.pluginSchedule()), { interval: 360, autoUpdate: true })
+for (const stored of [
+  { interval: 0, autoUpdate: false },
+  { interval: 1440, autoUpdate: true }
+]) {
+  assert.deepEqual(clone(pluginDefaults.pluginSchedule(stored)), stored)
+}
+assert.match(
+  read('src/main/resolve/plugin/index.ts'),
+  /interval: DEFAULT_PLUGIN_INTERVAL_MIN,\s+autoUpdate: true/
+)
+console.log('New plugin six-hour schedules and stored choices passed')

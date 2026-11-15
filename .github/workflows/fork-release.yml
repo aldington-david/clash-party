@@ -126,7 +126,7 @@ jobs:
       - name: Type check
         run: pnpm typecheck
       - name: Check core download integrity and legacy vault fallback
-        run: pnpm exec vitest run src/main/utils/github.test.ts src/main/resolve/plugin/vault.test.ts && node .anytls/test_source_compat.mjs
+        run: pnpm exec vitest run src/main/utils/github.test.ts src/main/resolve/plugin/vault.test.ts src/main/config/profile.test.ts src/main/core/profileUpdater.test.ts && node .anytls/test_source_compat.mjs
       - name: Configure Linux package
         if: matrix.platform == 'linux'
         shell: bash

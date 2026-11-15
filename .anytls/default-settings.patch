@@ -296,3 +296,169 @@ index a80b43f..a60f25c 100644
    'auto-route': true,
    'auto-redirect': false,
    'auto-detect-interface': true,
+diff --git a/src/main/config/plugin.ts b/src/main/config/plugin.ts
+index 8e819c1..f4866e6 100644
+--- a/src/main/config/plugin.ts
++++ b/src/main/config/plugin.ts
+@@ -7,7 +7,7 @@ let pluginConfig: IPluginConfig | undefined
+ const writeQueue = new WriteQueue()
+
+ // 插件记录的调度默认值：安装时写入 interval；autoUpdate 缺省视为开启
+-export const DEFAULT_PLUGIN_INTERVAL_MIN = 1440 // 24h
++export const DEFAULT_PLUGIN_INTERVAL_MIN = 360 // 6h
+
+ // profile 侧的调度字段以插件记录为准；这里是唯一的解析点（缺省值只在此处出现）
+ export function pluginSchedule(item?: IPluginItem): { interval: number; autoUpdate: boolean } {
+diff --git a/src/main/config/profile.test.ts b/src/main/config/profile.test.ts
+index 65228fc..2df8e84 100644
+--- a/src/main/config/profile.test.ts
++++ b/src/main/config/profile.test.ts
+@@ -615,3 +615,72 @@ describe('plugin subscription validation follow-ups (V7 regressions)', () => {
+     })
+   })
+ })
++
++describe('new remote subscription schedule defaults', () => {
++  it('uses six hours even when the first response recommends another interval', async () => {
++    mocks.axiosGet.mockResolvedValue({
++      status: 200,
++      data: newProfile,
++      headers: { 'profile-update-interval': '24' }
++    })
++    const item = await createProfile({ type: 'remote', url: 'https://example.test/subscription' })
++    expect(item).toMatchObject({ autoUpdate: true, interval: 360, allowFixedInterval: true })
++  })
++
++  it('uses six hours without a response interval', async () => {
++    const item = await createProfile({ type: 'remote', url: 'https://example.test/subscription' })
++    expect(item).toMatchObject({ autoUpdate: true, interval: 360, allowFixedInterval: true })
++  })
++
++  it('retains an explicit disabled switch and fixed interval', async () => {
++    mocks.axiosGet.mockResolvedValue({
++      status: 200,
++      data: newProfile,
++      headers: { 'profile-update-interval': '24' }
++    })
++    const item = await createProfile({
++      type: 'remote',
++      url: 'https://example.test/subscription',
++      autoUpdate: false,
++      interval: 90,
++      allowFixedInterval: true
++    })
++    expect(item).toMatchObject({ autoUpdate: false, interval: 90, allowFixedInterval: true })
++  })
++
++  it('retains the explicit choice to follow the response interval', async () => {
++    mocks.axiosGet.mockResolvedValue({
++      status: 200,
++      data: newProfile,
++      headers: { 'profile-update-interval': '12' }
++    })
++    const item = await createProfile({
++      id: 'remote',
++      type: 'remote',
++      url: 'https://example.test/subscription',
++      autoUpdate: false,
++      interval: 60,
++      allowFixedInterval: false
++    })
++    expect(item).toMatchObject({ autoUpdate: false, interval: 720, allowFixedInterval: false })
++  })
++
++  it('retains zero or missing intervals on existing subscriptions and local files', async () => {
++    const item = await createProfile({
++      id: 'remote',
++      type: 'remote',
++      url: 'https://example.test/subscription',
++      interval: 0,
++      autoUpdate: false
++    })
++    expect(item).toMatchObject({ interval: 0, autoUpdate: false, allowFixedInterval: false })
++    const legacy = await createProfile({
++      id: 'remote',
++      type: 'remote',
++      url: 'https://example.test/subscription'
++    })
++    expect(legacy.interval).toBe(0)
++    const local = await createProfile({ type: 'local', file: newProfile })
++    expect(local).toMatchObject({ interval: 0, allowFixedInterval: false })
++  })
++})
+diff --git a/src/main/config/profile.ts b/src/main/config/profile.ts
+index 288f09e..8b49ee8 100644
+--- a/src/main/config/profile.ts
++++ b/src/main/config/profile.ts
+@@ -514,16 +514,17 @@ async function fetchAndValidateSubscription(options: FetchOptions): Promise<Fetc
+
+ export async function createProfile(item: Partial<IProfileItem>): Promise<IProfileItem> {
+   const id = item.id || new Date().getTime().toString(16)
++  const isNewRemote = item.type === 'remote' && !item.id
+   const newItem: IProfileItem = {
+     id,
+     name: item.name || (item.type === 'remote' ? 'Remote File' : 'Local File'),
+     type: item.type || 'local',
+     url: item.url,
+     substore: item.substore || false,
+-    interval: item.interval || 0,
++    interval: item.interval ?? (isNewRemote ? 360 : 0),
+     override: item.override || [],
+     useProxy: item.useProxy || false,
+-    allowFixedInterval: item.allowFixedInterval || false,
++    allowFixedInterval: item.allowFixedInterval ?? isNewRemote,
+     autoUpdate: item.autoUpdate ?? true,
+     authToken: item.authToken,
+     userAgent: item.userAgent,
+@@ -607,7 +608,7 @@ export async function createProfile(item: Partial<IProfileItem>): Promise<IProfi
+     if (headers['profile-web-page-url']) {
+       newItem.home = headers['profile-web-page-url']
+     }
+-    if (headers['profile-update-interval'] && !item.allowFixedInterval) {
++    if (headers['profile-update-interval'] && !newItem.allowFixedInterval) {
+       const hours = Number(headers['profile-update-interval'])
+       if (Number.isFinite(hours) && hours > 0) {
+         newItem.interval = Math.min(Math.ceil(hours * 60), MAX_PROFILE_INTERVAL_MINUTES)
+diff --git a/src/main/core/profileUpdater.test.ts b/src/main/core/profileUpdater.test.ts
+index 5779cc1..da1ad1e 100644
+--- a/src/main/core/profileUpdater.test.ts
++++ b/src/main/core/profileUpdater.test.ts
+@@ -22,6 +22,8 @@ vi.mock('../resolve/plugin', () => ({
+   updatePluginProfile: mocks.updatePluginProfile
+ }))
+
++vi.mock('../window', () => ({ mainWindow: null }))
++
+ vi.mock('../utils/logger', () => ({
+   logger: { warn: vi.fn() }
+ }))
+@@ -96,3 +98,29 @@ describe('initProfileUpdater', () => {
+     expect(mocks.addProfileItem).toHaveBeenCalledWith(remoteProfile)
+   })
+ })
++
++describe('six-hour subscription timer', () => {
++  it('refreshes an enabled remote subscription after 360 minutes', async () => {
++    vi.useFakeTimers()
++    const { addProfileUpdater, removeProfileUpdater } = await import('./profileUpdater')
++    const item = {
++      id: 'six-hour',
++      type: 'remote' as const,
++      name: 'Remote',
++      autoUpdate: true,
++      interval: 360
++    }
++    mocks.getProfileItem.mockResolvedValue(item)
++    mocks.addProfileItem.mockClear()
++    try {
++      await addProfileUpdater(item)
++      await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000 - 1)
++      expect(mocks.addProfileItem).not.toHaveBeenCalled()
++      await vi.advanceTimersByTimeAsync(1)
++      expect(mocks.addProfileItem).toHaveBeenCalledOnce()
++    } finally {
++      await removeProfileUpdater(item.id)
++      vi.useRealTimers()
++    }
++  })
++})

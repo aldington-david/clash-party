@@ -6,7 +6,7 @@ It uses only aldington-david/mihomo stable releases with the AnyTLS + REALITY pa
 The `anytls-reality` default branch owns the automation and `.anytls/client.patch`.
 Every hour at minute 27 (UTC), or on manual dispatch, the workflow checks the latest
 non-prerelease upstream app and custom core releases. A change in either creates
-`APP_TAG-anytls-CORE_TAG-r3`. Existing public releases are never replaced.
+`APP_TAG-anytls-CORE_TAG-r4`. Existing public releases are never replaced.
 
 The workflow checks out the exact upstream app tag, applies the patch with
 `git apply --check`, pins the core tag, and pushes a source tag containing the
@@ -83,3 +83,12 @@ copies it before the first window render only when the user's theme file is abse
 existing same-name CSS is retained. Development resolves the tracked source asset,
 while packaged builds use the bundled resource. CI exercises both paths and checks
 the theme in all six packaged applications before installer publication.
+
+## New subscription schedules in revision 4
+
+New remote subscriptions keep automatic updates enabled and use a fixed 360-minute
+interval. Their first response cannot replace that default with the server's
+suggested interval. Existing subscriptions retain their stored switch, interval
+and choice to follow server recommendations; local files retain their old behavior.
+New plugin subscriptions also default to 360 minutes with updates enabled.
+The existing application startup, interval and Cron scheduling paths remain unchanged.
