@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path, { resolve } from 'node:path'
-import { createHash } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
 import ts from 'typescript'
@@ -30,14 +30,17 @@ function loadModule(name, dependencies = {}, globals = {}) {
 }
 
 const { deepMerge } = loadModule('src/main/utils/merge.ts')
+const shared = loadModule('src/shared/appConfig.ts')
 function loadConfig(
   input,
-  defaults = { modeSelected: false, operationMode: 'standard', core: 'mihomo', maxLogFileSize: 5 }
+  defaults = { core: 'mihomo', maxLogFileSize: 5, mcpToken: '', yamlMaxAliasCount: 100 }
 ) {
   const writes = []
   let writeFails = false
+  let stored = input
   const api = loadModule('src/main/config/app.ts', {
-    'fs/promises': { readFile: async () => JSON.stringify(input) },
+    'node:crypto': { randomBytes },
+    'fs/promises': { readFile: async () => JSON.stringify(stored) },
     '../utils/dirs': { appConfigPath: () => 'mock-config.yaml' },
     '../utils/safeFile': {
       WriteQueue: class {
@@ -47,7 +50,8 @@ function loadConfig(
       },
       atomicWriteFile: async (_, value) => {
         if (writeFails) throw new Error('simulated write failure')
-        writes.push(JSON.parse(value))
+        stored = JSON.parse(value)
+        writes.push(stored)
       }
     },
     '../utils/yaml': { parse: JSON.parse, stringify: JSON.stringify },
@@ -60,41 +64,63 @@ function loadConfig(
       setCoreLogDisabled: () => undefined,
       setGlobalMaxLogFileSizeMB: () => undefined
     },
-    '../utils/logger': { setAppLogDisabled: () => undefined }
+    '../utils/logger': { setAppLogDisabled: () => undefined },
+    '../../shared/appConfig': shared
   })
   return { api, writes, failWrites: () => (writeFails = true) }
 }
 
-const legacy = loadConfig({ core: 'mihomo-smart', enableSmartCore: true, keep: 'value' })
+const legacy = loadConfig({
+  operationMode: 'simple',
+  modeSelected: true,
+  core: 'mihomo-smart',
+  enableSmartCore: true,
+  silentStart: true,
+  keep: 'value'
+})
 const migrated = await legacy.api.getAppConfig()
-assert.equal(migrated.modeSelected, true)
-assert.equal(migrated.operationMode, 'standard')
+assert.equal(legacy.api.getLegacyOperationMode(), 'simple')
+assert.equal(migrated.modeSelected, undefined)
+assert.equal(migrated.operationMode, undefined)
 assert.equal(migrated.core, 'mihomo')
 assert.equal(migrated.enableSmartCore, false)
 assert.equal(migrated.enableSmartOverride, false)
 assert.equal(legacy.writes.at(-1).keep, 'value')
-assert.equal(legacy.writes.at(-1).modeSelected, true)
+assert.equal(legacy.writes.at(-1).modeSelected, undefined)
+assert.equal(legacy.writes.at(-1).operationMode, undefined)
+await legacy.api.getAppConfig(true)
+assert.equal(legacy.api.getLegacyOperationMode(), 'simple')
 
-const fresh = loadConfig({ modeSelected: false, operationMode: 'standard' })
-assert.equal((await fresh.api.getAppConfig()).modeSelected, false)
-const simple = loadConfig({ modeSelected: true, operationMode: 'simple', core: 'mihomo-specific' })
-assert.equal((await simple.api.getAppConfig()).operationMode, 'simple')
-assert.equal((await simple.api.getAppConfig()).core, 'mihomo-specific')
-await simple.api.patchAppConfig({ core: 'mihomo-alpha', enableSmartCore: true })
-assert.equal(simple.writes.at(-1).core, 'mihomo')
-assert.equal(simple.writes.at(-1).operationMode, 'simple')
+const fresh = loadConfig({ yamlMaxAliasCount: 'invalid' })
+const freshConfig = await fresh.api.getAppConfig()
+assert.equal(fresh.api.getLegacyOperationMode(), null)
+assert.equal(freshConfig.operationMode, undefined)
+assert.equal(freshConfig.yamlMaxAliasCount, shared.DEFAULT_YAML_MAX_ALIAS_COUNT)
+assert.match(freshConfig.mcpToken, /^[a-f0-9]{64}$/)
+await fresh.api.patchAppConfig({ yamlMaxAliasCount: -2, mcpToken: ' ' })
+assert.equal(fresh.writes.at(-1).yamlMaxAliasCount, shared.DEFAULT_YAML_MAX_ALIAS_COUNT)
+assert.match(fresh.writes.at(-1).mcpToken, /^[a-f0-9]{64}$/)
+assert.notEqual(fresh.writes.at(-1).mcpToken, freshConfig.mcpToken)
+const saved = loadConfig({
+  core: 'mihomo-specific',
+  mcpToken: 'existing-user-token',
+  yamlMaxAliasCount: 25
+})
+assert.equal((await saved.api.getAppConfig()).core, 'mihomo-specific')
+assert.equal((await saved.api.getAppConfig()).mcpToken, 'existing-user-token')
+assert.equal((await saved.api.getAppConfig()).yamlMaxAliasCount, 25)
+await saved.api.patchAppConfig({ core: 'mihomo-alpha', enableSmartCore: true })
+assert.equal(saved.writes.at(-1).core, 'mihomo')
+assert.equal(saved.writes.at(-1).mcpToken, 'existing-user-token')
 
 legacy.failWrites()
+await assert.rejects(legacy.api.patchAppConfig({ silentStart: false }), /simulated write failure/)
+assert.equal((await legacy.api.getAppConfig()).silentStart, true)
 await assert.rejects(
-  legacy.api.patchAppConfig({ operationMode: 'simple' }),
+  legacy.api.syncAppConfigAfterApply({ silentStart: false, core: 'mihomo-alpha' }),
   /simulated write failure/
 )
-assert.equal((await legacy.api.getAppConfig()).operationMode, 'standard')
-await assert.rejects(
-  legacy.api.syncAppConfigAfterApply({ operationMode: 'simple', core: 'mihomo-alpha' }),
-  /simulated write failure/
-)
-assert.equal((await legacy.api.getAppConfig()).operationMode, 'simple')
+assert.equal((await legacy.api.getAppConfig()).silentStart, false)
 assert.equal((await legacy.api.getAppConfig()).core, 'mihomo')
 
 const windowSource = ts.createSourceFile(
@@ -164,10 +190,9 @@ assert.deepEqual(messages, ['rendererFirstContentReady'])
 let lateListenerRan = false
 startup.onInitialContentReady(() => (lateListenerRan = true))
 assert.ok(lateListenerRan)
-console.log('v2.0.4 migration, persistence, legacy IPC and first-content checks passed')
+console.log('v2.0.5 legacy migration capture, token/YAML limits, persistence and IPC checks passed')
 
 const clone = (value) => JSON.parse(JSON.stringify(value))
-const shared = loadModule('src/shared/appConfig.ts')
 const templates = (platform) =>
   loadModule(
     'src/main/utils/template.ts',
@@ -222,8 +247,14 @@ const savedApp = {
   connectionViewMode: 'table',
   sysProxy: { enable: true, mode: 'manual' }
 }
-const retainedApp = await loadConfig(savedApp, defaultConfig).api.getAppConfig()
-for (const [key, expected] of Object.entries(savedApp))
+const retainedConfig = loadConfig(savedApp, defaultConfig)
+const retainedApp = await retainedConfig.api.getAppConfig()
+assert.equal(retainedConfig.api.getLegacyOperationMode(), savedApp.operationMode)
+assert.equal(retainedApp.operationMode, undefined)
+assert.equal(retainedApp.modeSelected, undefined)
+for (const [key, expected] of Object.entries(savedApp).filter(
+  ([key]) => !['operationMode', 'modeSelected'].includes(key)
+))
   assert.deepEqual(clone(retainedApp[key]), expected, key)
 const queue = class {
   run(action) {
@@ -231,7 +262,7 @@ const queue = class {
   }
 }
 const logger = { info: () => undefined, warn: () => undefined, error: () => undefined }
-const simpleShared = loadModule('src/shared/simple-config.ts')
+const localShared = loadModule('src/shared/local-config.ts')
 async function readControlled(input, exists = true) {
   const writes = []
   const config = loadModule('src/main/config/controledMihomo.ts', {
@@ -249,8 +280,12 @@ async function readControlled(input, exists = true) {
       atomicWriteFile: async (_, data) => writes.push(JSON.parse(data))
     },
     '../../shared/appConfig': shared,
-    '../../shared/simple-config': simpleShared,
-    './app': { getAppConfig: async () => ({ operationMode: 'standard' }) }
+    '../../shared/local-config': localShared,
+    './profile': {
+      getProfileConfig: async () => ({ current: 'remote' }),
+      getProfileItem: async () => ({ type: 'remote' })
+    },
+    './app': { getAppConfig: async () => ({}) }
   })
   return { config: await config.getControledMihomoConfig(), writes }
 }
@@ -299,10 +334,13 @@ for (const [key, value] of Object.entries(savedCore.tun))
 
 const guard = loadModule('src/main/core/dnsOverrideGuard.ts', {
   crypto: { createHash },
+  electron: { dialog: {} },
+  i18next: { default: { t: (key) => key } },
   '../config': {},
   '../window': { mainWindow: null },
   '../utils/logger': { createLogger: () => logger },
-  '../../shared/appConfig': shared
+  '../../shared/appConfig': shared,
+  '../../shared/local-config': localShared
 })
 const subscription = {
   proxies: [],
@@ -345,7 +383,8 @@ for (const config of [
     '../utils/age': {},
     '../../shared/appConfig': shared,
     '../utils/safeFile': { atomicWriteFile: async (_, data) => writes.push(JSON.parse(data)) },
-    '../simple/service': {},
+    '../local/service': {},
+    '../../shared/local-config': localShared,
     './dnsOverrideGuard': guard
   })
   await factory.generateProfile(undefined, { updateRuntimeConfig: false })

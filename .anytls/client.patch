@@ -14,7 +14,7 @@ index 78f4cc6..3e2ad4b 100644
 +__pycache__/
 +.localpycache/
 diff --git a/electron-builder.yml b/electron-builder.yml
-index 69a05cd..2ed79e8 100644
+index 28b15e73..34cfb157 100644
 --- a/electron-builder.yml
 +++ b/electron-builder.yml
 @@ -9,6 +9,9 @@ files:
@@ -45,12 +45,13 @@ index 69a05cd..2ed79e8 100644
    gatekeeperAssess: false
    extendInfo:
      - NSCameraUsageDescription: Application requests access to the device's camera.
-@@ -80,8 +83,6 @@ linux:
+@@ -85,9 +88,6 @@ linux:
        Icon: mihomo-party
    target:
      - deb
 -    - rpm
 -    - pacman
+-    - tar.gz
    maintainer: mihomo-party-org
    category: Utility
    artifactName: clash-party-linux-${version}-${arch}.${ext}
@@ -330,20 +331,20 @@ index 0cfb6bb..26241fe 100644
    { name: 'metadb', func: resolveMetadb, retry: 5 },
    { name: 'geosite', func: resolveGeosite, retry: 5 },
 diff --git a/src/main/config/app.ts b/src/main/config/app.ts
-index f788b08..3ebe12c 100644
+index 6c237bda..c15517f8 100644
 --- a/src/main/config/app.ts
 +++ b/src/main/config/app.ts
-@@ -40,6 +40,9 @@ export async function getAppConfig(force = false): Promise<IAppConfig> {
-         mergedConfig.modeSelected = true
-         mergedConfig.operationMode = 'standard'
-       }
+@@ -52,6 +52,9 @@ export async function getAppConfig(force = false): Promise<IAppConfig> {
+       const legacy = mergedConfig as unknown as Record<string, unknown>
+       delete legacy.operationMode
+       delete legacy.modeSelected
 +      mergedConfig.enableSmartCore = false
 +      mergedConfig.enableSmartOverride = false
 +      if (mergedConfig.core !== 'mihomo-specific') mergedConfig.core = 'mihomo'
        mergedConfig.maxLogFileSize = normalizeMaxLogFileSizeMB(mergedConfig.maxLogFileSize)
-       if (JSON.stringify(mergedConfig) !== JSON.stringify(parsedConfig)) {
-         await atomicWriteFile(appConfigPath(), stringify(mergedConfig))
-@@ -76,6 +79,9 @@ async function writeAppConfig(
+       mergedConfig.yamlMaxAliasCount = normalizeYamlMaxAliasCount(mergedConfig.yamlMaxAliasCount)
+       ensureMcpToken(mergedConfig)
+@@ -90,6 +93,9 @@ async function writeAppConfig(
      if (replaceNameserverPolicy) {
        nextConfig.nameserverPolicy = patch.nameserverPolicy ?? {}
      }
@@ -351,21 +352,21 @@ index f788b08..3ebe12c 100644
 +    nextConfig.enableSmartOverride = false
 +    if (nextConfig.core !== 'mihomo-specific') nextConfig.core = 'mihomo'
      nextConfig.maxLogFileSize = normalizeMaxLogFileSizeMB(nextConfig.maxLogFileSize)
-     try {
-       await atomicWriteFile(appConfigPath(), stringify(nextConfig))
+     nextConfig.yamlMaxAliasCount = normalizeYamlMaxAliasCount(nextConfig.yamlMaxAliasCount)
+     ensureMcpToken(nextConfig)
 diff --git a/src/main/core/manager.ts b/src/main/core/manager.ts
-index ce55fe0..a1ba015 100644
+index 0c9e35ef..8c5c35f0 100644
 --- a/src/main/core/manager.ts
 +++ b/src/main/core/manager.ts
-@@ -91,7 +91,7 @@ const coreShutdownTimeout = 3000
+@@ -95,7 +95,7 @@ const coreShutdownTimeout = 3000
  const resumeReloadDelay = 5000
  // 同一次失败内核可能连打多行，10 秒内只提示一次，避免弹窗刷屏
  const tunFailureReportInterval = 10000
 -const coreProcessNames = ['mihomo', 'mihomo-alpha', 'mihomo-smart'] as const
 +const coreProcessNames = ['mihomo', 'mihomo-anytls-specific'] as const
+ const tailscaleAuthNotificationKeyPrefix = 'tailscale-auth:'
+ const directCoreLogLineLimit = 16 * 1024
  
- // 核心进程状态
- interface CoreProcessWatchdog {
 diff --git a/src/main/core/permissions.ts b/src/main/core/permissions.ts
 index a809b28..6763c89 100644
 --- a/src/main/core/permissions.ts
@@ -801,3 +802,38 @@ index 09e9b27..5c1341b 100644
                  <SelectItem key="mihomo-specific">{t(CoreMap['mihomo-specific'])}</SelectItem>
                </Select>
              </SettingItem>
+diff --git a/src/main/lifecycle.ts b/src/main/lifecycle.ts
+index f05c3323..f66eebdb 100644
+--- a/src/main/lifecycle.ts
++++ b/src/main/lifecycle.ts
+@@ -2,7 +2,8 @@ import { spawn, exec, execFileSync } from 'child_process'
+ import { promisify } from 'util'
+ import { stat } from 'fs/promises'
+ import { existsSync } from 'fs'
+-import { app, BaseWindow, powerMonitor } from 'electron'
++import * as electron from 'electron'
++import type { EventEmitter } from 'events'
+ import { stopCoreForExit, cleanupCoreWatcher } from './core/manager'
+ import { primeAdminPrivilegesCache } from './core/admin'
+ import { triggerSysProxy, disableSysProxySync } from './sys/sysproxy'
+@@ -10,6 +11,11 @@ import { closeTrafficUsage } from './traffic/recorder'
+ import { exePath } from './utils/dirs'
+ import { saveMainWindowState } from './window'
+ 
++const { app, powerMonitor } = electron
++const BaseWindow = (electron as typeof electron & {
++  BaseWindow?: new (options: Electron.BrowserWindowConstructorOptions) => EventEmitter
++}).BaseWindow
++
+ export function customRelaunch(): void {
+   const script = `while kill -0 ${process.pid} 2>/dev/null; do
+   sleep 0.1
+@@ -78,7 +84,7 @@ function isWindowsElevatedSync(): boolean | null {
+   }
+ }
+ 
+-let sessionEndWindow: BaseWindow | null = null
++let sessionEndWindow: EventEmitter | null = null
+ 
+ export function setupAppLifecycle(): void {
+   let sysProxyDisabled = false

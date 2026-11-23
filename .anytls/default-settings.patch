@@ -155,13 +155,13 @@ index 0000000..e650f11
 +    --heroui-hover-opacity: .9 !important;
 +}
 diff --git a/src/main/utils/init.ts b/src/main/utils/init.ts
-index cde78c5..49dd8e2 100644
+index 4807731f..4a28f6f2 100644
 --- a/src/main/utils/init.ts
 +++ b/src/main/utils/init.ts
-@@ -137,6 +137,15 @@ async function initDirs(): Promise<void> {
+@@ -138,6 +138,15 @@ async function initDirs(): Promise<void> {
    )
  }
-
+ 
 +async function initBundledTheme(): Promise<void> {
 +  const target = path.join(themesDir(), 'homohub.css')
 +  if (existsSync(target)) return
@@ -172,10 +172,10 @@ index cde78c5..49dd8e2 100644
 +}
 +
  async function initConfig(): Promise<void> {
-   const configs = [
-     { path: appConfigPath(), content: defaultConfig, name: 'app config' },
-@@ -455,6 +464,7 @@ export async function initBasic(): Promise<void> {
-
+   const legacyStatePath = path.join(dataDir(), 'simple-config.yaml')
+   if (existsSync(legacyStatePath) && !existsSync(localConfigPath())) {
+@@ -488,6 +497,7 @@ export async function initBasic(): Promise<void> {
+ 
    initBasicPromise = (async () => {
      await initDirs()
 +    await initBundledTheme()
@@ -183,10 +183,10 @@ index cde78c5..49dd8e2 100644
      await migration()
      await migrateSubStoreFiles()
 diff --git a/src/main/utils/template.ts b/src/main/utils/template.ts
-index 67a6089..2ec7200 100644
+index 311c81f5..b68a251c 100644
 --- a/src/main/utils/template.ts
 +++ b/src/main/utils/template.ts
-@@ -23,10 +23,10 @@ export const defaultConfig: IAppConfig = {
+@@ -26,10 +26,10 @@ export const defaultConfig: IAppConfig = {
    enableSmartOverride: true,
    smartCoreUseLightGBM: false,
    smartCoreCollectData: false,
@@ -199,7 +199,7 @@ index 67a6089..2ec7200 100644
    showCurrentProxyInTray: false,
    enableTrafficLogger: DEFAULT_ENABLE_TRAFFIC_LOGGER,
    trayProxyGroupStyle: 'default',
-@@ -45,12 +45,12 @@ export const defaultConfig: IAppConfig = {
+@@ -48,12 +48,12 @@ export const defaultConfig: IAppConfig = {
    autoQuitWithoutCore: false,
    autoQuitWithoutCoreDelay: 60,
    autoQuitWithoutCoreMode: 'core',
@@ -213,8 +213,8 @@ index 67a6089..2ec7200 100644
 +  autoCloseConnection: false,
    autoCloseConnectionOnlyGroup: false,
    subscriptionTimeout: 30000,
-   gistAgeEncrypt: false,
-@@ -69,7 +69,7 @@ export const defaultConfig: IAppConfig = {
+   yamlMaxAliasCount: DEFAULT_YAML_MAX_ALIAS_COUNT,
+@@ -73,7 +73,7 @@ export const defaultConfig: IAppConfig = {
    siderOrder: DEFAULT_SIDER_ORDER,
    lastSelectedSiderCard: 'proxy',
    siderWidth: 250,
@@ -223,7 +223,7 @@ index 67a6089..2ec7200 100644
    triggerMainWindowBehavior: 'show',
    showMixedPort: DEFAULT_MIHOMO_PORTS.mixed,
    enableMixedPort: true,
-@@ -84,7 +84,12 @@ export const defaultConfig: IAppConfig = {
+@@ -88,7 +88,12 @@ export const defaultConfig: IAppConfig = {
    testProfileOnStart: true,
    coreStartupMode: 'log',
    useHotReloadProfile: false,
@@ -235,9 +235,9 @@ index 67a6089..2ec7200 100644
 +  mihomoCpuPriority: 'PRIORITY_ABOVE_NORMAL',
 +  customTheme: 'homohub.css'
  }
-
+ 
  export const defaultControledMihomoConfig: Partial<IMihomoConfig> = {
-@@ -100,8 +105,8 @@ export const defaultControledMihomoConfig: Partial<IMihomoConfig> = {
+@@ -104,8 +109,8 @@ export const defaultControledMihomoConfig: Partial<IMihomoConfig> = {
    'tproxy-port': DEFAULT_MIHOMO_PORTS.tproxy,
    'allow-lan': false,
    'unified-delay': true,
@@ -248,7 +248,7 @@ index 67a6089..2ec7200 100644
    'find-process-mode': 'strict',
    'bind-address': '*',
    'lan-allowed-ips': DEFAULT_MIHOMO_LAN_ALLOWED_IPS,
-@@ -118,7 +123,7 @@ export const defaultControledMihomoConfig: Partial<IMihomoConfig> = {
+@@ -122,7 +127,7 @@ export const defaultControledMihomoConfig: Partial<IMihomoConfig> = {
      'store-selected': true,
      'store-fake-ip': true
    },
@@ -258,27 +258,27 @@ index 67a6089..2ec7200 100644
    // Smart 内核自带的 LightGBM 模型更新器，默认值与内核一致（关闭 / 72 小时 /
    // 空地址即用内核内置地址）。非 Smart 内核会忽略这几个键。
 diff --git a/src/shared/appConfig.ts b/src/shared/appConfig.ts
-index a80b43f..a60f25c 100644
+index 759920d0..70d9e0c8 100644
 --- a/src/shared/appConfig.ts
 +++ b/src/shared/appConfig.ts
 @@ -1,6 +1,6 @@
  export const DEFAULT_CONTROL_DNS = false
-
+ 
 -export const DEFAULT_CONTROL_SNIFF = true
 +export const DEFAULT_CONTROL_SNIFF = false
-
+ 
  export const DEFAULT_USE_NAMESERVER_POLICY = false
-
+ 
 @@ -8,7 +8,7 @@ export const DEFAULT_NAMESERVER_POLICY: IAppConfig['nameserverPolicy'] = {}
-
+ 
  export const DEFAULT_ENABLE_TRAFFIC_LOGGER = true
-
+ 
 -export const DEFAULT_USE_SUB_STORE = true
 +export const DEFAULT_USE_SUB_STORE = false
-
- export const DEFAULT_SIDER_ORDER: SiderCardKey[] = [
-   'sysproxy',
-@@ -49,6 +49,7 @@ export function getDefaultMihomoTunDevice(platform: NodeJS.Platform | string): s
+ 
+ export const DEFAULT_YAML_MAX_ALIAS_COUNT = 100
+ 
+@@ -59,6 +59,7 @@ export function getDefaultMihomoTunDevice(platform: NodeJS.Platform | string): s
  type DefaultMihomoTunConfig = {
    enable: boolean
    stack: TunStack
@@ -286,8 +286,8 @@ index a80b43f..a60f25c 100644
    'auto-route': boolean
    'auto-redirect': boolean
    'auto-detect-interface': boolean
-@@ -59,7 +60,8 @@ type DefaultMihomoTunConfig = {
-
+@@ -69,7 +70,8 @@ type DefaultMihomoTunConfig = {
+ 
  export const DEFAULT_MIHOMO_TUN_CONFIG: DefaultMihomoTunConfig = {
    enable: false,
 -  stack: 'mixed',
@@ -387,19 +387,20 @@ index 65228fc..2df8e84 100644
 +  })
 +})
 diff --git a/src/main/config/profile.ts b/src/main/config/profile.ts
-index 288f09e..8b49ee8 100644
+index 1f19b341..65bdb769 100644
 --- a/src/main/config/profile.ts
 +++ b/src/main/config/profile.ts
-@@ -514,16 +514,17 @@ async function fetchAndValidateSubscription(options: FetchOptions): Promise<Fetc
-
+@@ -592,6 +592,7 @@ async function fetchAndValidateSubscription(options: FetchOptions): Promise<Fetc
+ 
  export async function createProfile(item: Partial<IProfileItem>): Promise<IProfileItem> {
    const id = item.id || new Date().getTime().toString(16)
 +  const isNewRemote = item.type === 'remote' && !item.id
    const newItem: IProfileItem = {
      id,
      name: item.name || (item.type === 'remote' ? 'Remote File' : 'Local File'),
-     type: item.type || 'local',
-     url: item.url,
+@@ -601,10 +602,10 @@ export async function createProfile(item: Partial<IProfileItem>): Promise<IProfi
+     extra: item.extra,
+     customHome: normalizeCustomHome(item.customHome),
      substore: item.substore || false,
 -    interval: item.interval || 0,
 +    interval: item.interval ?? (isNewRemote ? 360 : 0),
@@ -410,8 +411,8 @@ index 288f09e..8b49ee8 100644
      autoUpdate: item.autoUpdate ?? true,
      authToken: item.authToken,
      userAgent: item.userAgent,
-@@ -607,7 +608,7 @@ export async function createProfile(item: Partial<IProfileItem>): Promise<IProfi
-     if (headers['profile-web-page-url']) {
+@@ -688,7 +689,7 @@ export async function createProfile(item: Partial<IProfileItem>): Promise<IProfi
+     if (isHttpUrl(headers['profile-web-page-url'])) {
        newItem.home = headers['profile-web-page-url']
      }
 -    if (headers['profile-update-interval'] && !item.allowFixedInterval) {
@@ -462,3 +463,20 @@ index 5779cc1..da1ad1e 100644
 +    }
 +  })
 +})
+diff --git a/src/main/utils/init.local-migration.test.ts b/src/main/utils/init.local-migration.test.ts
+index 11435a8d..ce2d3047 100644
+--- a/src/main/utils/init.local-migration.test.ts
++++ b/src/main/utils/init.local-migration.test.ts
+@@ -27,6 +27,12 @@ vi.mock('electron', () => ({
+ 
+ vi.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
+ 
++vi.mock('../window', () => ({ mainWindow: null }))
++vi.mock('./dirs', async (importOriginal) => ({
++  ...(await importOriginal<typeof import('./dirs')>()),
++  resourcesFilesDir: () => path.join(process.cwd(), 'resources', 'themes')
++}))
++
+ vi.mock('sysproxy-rs', () => ({
+   triggerAutoProxy: vi.fn(),
+   triggerManualProxy: vi.fn()
