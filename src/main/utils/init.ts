@@ -138,6 +138,15 @@ async function initDirs(): Promise<void> {
   )
 }
 
+async function initBundledTheme(): Promise<void> {
+  const target = path.join(themesDir(), 'homohub.css')
+  if (existsSync(target)) return
+  const source = app.isPackaged
+    ? path.join(resourcesFilesDir(), 'homohub.css')
+    : path.join(app.getAppPath(), 'resources/themes/homohub.css')
+  await cp(source, target, { force: false })
+}
+
 async function initConfig(): Promise<void> {
   const legacyStatePath = path.join(dataDir(), 'simple-config.yaml')
   if (existsSync(legacyStatePath) && !existsSync(localConfigPath())) {
@@ -171,7 +180,7 @@ async function killOldMihomoProcesses(): Promise<void> {
 
   try {
     const execFilePromise = promisify(execFile)
-    const coreNames = new Set(['mihomo.exe', 'mihomo-alpha.exe', 'mihomo-smart.exe'])
+    const coreNames = new Set(['mihomo.exe', 'mihomo-anytls-specific.exe'])
     const { stdout } = await execFilePromise('tasklist', ['/FO', 'CSV', '/NH'], {
       windowsHide: true,
       timeout: 3000,
@@ -488,6 +497,7 @@ export async function initBasic(): Promise<void> {
 
   initBasicPromise = (async () => {
     await initDirs()
+    await initBundledTheme()
     await initConfig()
     await migration()
     await migrateSubStoreFiles()

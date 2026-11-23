@@ -95,7 +95,7 @@ const coreShutdownTimeout = 3000
 const resumeReloadDelay = 5000
 // 同一次失败内核可能连打多行，10 秒内只提示一次，避免弹窗刷屏
 const tunFailureReportInterval = 10000
-const coreProcessNames = ['mihomo', 'mihomo-alpha', 'mihomo-smart'] as const
+const coreProcessNames = ['mihomo', 'mihomo-anytls-specific'] as const
 const tailscaleAuthNotificationKeyPrefix = 'tailscale-auth:'
 const directCoreLogLineLimit = 16 * 1024
 

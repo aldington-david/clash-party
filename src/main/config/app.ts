@@ -52,6 +52,9 @@ export async function getAppConfig(force = false): Promise<IAppConfig> {
       const legacy = mergedConfig as unknown as Record<string, unknown>
       delete legacy.operationMode
       delete legacy.modeSelected
+      mergedConfig.enableSmartCore = false
+      mergedConfig.enableSmartOverride = false
+      if (mergedConfig.core !== 'mihomo-specific') mergedConfig.core = 'mihomo'
       mergedConfig.maxLogFileSize = normalizeMaxLogFileSizeMB(mergedConfig.maxLogFileSize)
       mergedConfig.yamlMaxAliasCount = normalizeYamlMaxAliasCount(mergedConfig.yamlMaxAliasCount)
       ensureMcpToken(mergedConfig)
@@ -90,6 +93,9 @@ async function writeAppConfig(
     if (replaceNameserverPolicy) {
       nextConfig.nameserverPolicy = patch.nameserverPolicy ?? {}
     }
+    nextConfig.enableSmartCore = false
+    nextConfig.enableSmartOverride = false
+    if (nextConfig.core !== 'mihomo-specific') nextConfig.core = 'mihomo'
     nextConfig.maxLogFileSize = normalizeMaxLogFileSizeMB(nextConfig.maxLogFileSize)
     nextConfig.yamlMaxAliasCount = normalizeYamlMaxAliasCount(nextConfig.yamlMaxAliasCount)
     ensureMcpToken(nextConfig)

@@ -2,13 +2,19 @@ import { spawn, exec, execFileSync } from 'child_process'
 import { promisify } from 'util'
 import { stat } from 'fs/promises'
 import { existsSync } from 'fs'
-import { app, BaseWindow, powerMonitor } from 'electron'
+import * as electron from 'electron'
+import type { EventEmitter } from 'events'
 import { stopCoreForExit, cleanupCoreWatcher } from './core/manager'
 import { primeAdminPrivilegesCache } from './core/admin'
 import { triggerSysProxy, disableSysProxySync } from './sys/sysproxy'
 import { closeTrafficUsage } from './traffic/recorder'
 import { exePath } from './utils/dirs'
 import { saveMainWindowState } from './window'
+
+const { app, powerMonitor } = electron
+const BaseWindow = (electron as typeof electron & {
+  BaseWindow?: new (options: Electron.BrowserWindowConstructorOptions) => EventEmitter
+}).BaseWindow
 
 export function customRelaunch(): void {
   const script = `while kill -0 ${process.pid} 2>/dev/null; do
@@ -78,7 +84,7 @@ function isWindowsElevatedSync(): boolean | null {
   }
 }
 
-let sessionEndWindow: BaseWindow | null = null
+let sessionEndWindow: EventEmitter | null = null
 
 export function setupAppLifecycle(): void {
   let sysProxyDisabled = false

@@ -592,6 +592,7 @@ async function fetchAndValidateSubscription(options: FetchOptions): Promise<Fetc
 
 export async function createProfile(item: Partial<IProfileItem>): Promise<IProfileItem> {
   const id = item.id || new Date().getTime().toString(16)
+  const isNewRemote = item.type === 'remote' && !item.id
   const newItem: IProfileItem = {
     id,
     name: item.name || (item.type === 'remote' ? 'Remote File' : 'Local File'),
@@ -601,10 +602,10 @@ export async function createProfile(item: Partial<IProfileItem>): Promise<IProfi
     extra: item.extra,
     customHome: normalizeCustomHome(item.customHome),
     substore: item.substore || false,
-    interval: item.interval || 0,
+    interval: item.interval ?? (isNewRemote ? 360 : 0),
     override: item.override || [],
     useProxy: item.useProxy || false,
-    allowFixedInterval: item.allowFixedInterval || false,
+    allowFixedInterval: item.allowFixedInterval ?? isNewRemote,
     autoUpdate: item.autoUpdate ?? true,
     authToken: item.authToken,
     userAgent: item.userAgent,
@@ -688,7 +689,7 @@ export async function createProfile(item: Partial<IProfileItem>): Promise<IProfi
     if (isHttpUrl(headers['profile-web-page-url'])) {
       newItem.home = headers['profile-web-page-url']
     }
-    if (headers['profile-update-interval'] && !item.allowFixedInterval) {
+    if (headers['profile-update-interval'] && !newItem.allowFixedInterval) {
       const hours = Number(headers['profile-update-interval'])
       if (Number.isFinite(hours) && hours > 0) {
         newItem.interval = Math.min(Math.ceil(hours * 60), MAX_PROFILE_INTERVAL_MINUTES)

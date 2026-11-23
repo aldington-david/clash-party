@@ -44,6 +44,8 @@ type OptionalAsyncSafeStorage = {
   decryptStringAsync?: (encrypted: Buffer) => Promise<{ result: string; shouldReEncrypt: boolean }>
 }
 
+const asyncStorage = safeStorage as typeof safeStorage & OptionalAsyncSafeStorage
+
 const ENDPOINT_KEYS = ['enroll', 'challenge', 'config', 'revoke'] as const
 
 // 写出前归一化：镜像 gateway.gateway = lastGood ?? gateways[0]，直到明确停止支持应用降级（§2.3）。
@@ -169,7 +171,7 @@ async function linuxUsesFixedKey(mode: 'persistent-async' | 'persistent-sync'): 
   try {
     const canary =
       mode === 'persistent-async'
-        ? await safeStorage.encryptStringAsync('plugin-vault-canary')
+        ? await asyncStorage.encryptStringAsync!('plugin-vault-canary')
         : safeStorage.encryptString('plugin-vault-canary')
     linuxFixedKeyBackend = canary.subarray(0, 3).toString('latin1') === FIXED_KEY_CIPHERTEXT_PREFIX
     return linuxFixedKeyBackend
@@ -180,7 +182,6 @@ async function linuxUsesFixedKey(mode: 'persistent-async' | 'persistent-sync'): 
 
 async function storageMode(): Promise<StorageMode> {
   if (!linuxBackendIsSecure()) return 'memory'
-  const asyncStorage = safeStorage as typeof safeStorage & OptionalAsyncSafeStorage
   let mode: 'persistent-async' | 'persistent-sync' | undefined
   if (
     typeof asyncStorage.isAsyncEncryptionAvailable === 'function' &&
@@ -219,7 +220,7 @@ export async function ensureVaultWritable(): Promise<void> {
 
   try {
     if (mode === 'persistent-async') {
-      await safeStorage.encryptStringAsync('plugin-vault-preflight')
+      await asyncStorage.encryptStringAsync!('plugin-vault-preflight')
     } else {
       safeStorage.encryptString('plugin-vault-preflight')
     }
@@ -253,7 +254,7 @@ async function writeVaultRaw(id: string, vault: IPluginVault): Promise<void> {
   try {
     encrypted =
       mode === 'persistent-async'
-        ? await safeStorage.encryptStringAsync(JSON.stringify(vault))
+        ? await asyncStorage.encryptStringAsync!(JSON.stringify(vault))
         : safeStorage.encryptString(JSON.stringify(vault))
   } catch {
     throw new VaultUnavailableError()
@@ -274,7 +275,7 @@ export function writeVault(id: string, vault: IPluginVault, signal?: AbortSignal
 
 async function bestEffortReEncrypt(id: string, vault: IPluginVault): Promise<void> {
   try {
-    const encrypted = await safeStorage.encryptStringAsync(JSON.stringify(vault))
+    const encrypted = await asyncStorage.encryptStringAsync!(JSON.stringify(vault))
     await atomicWriteFile(pluginVaultPath(id), encrypted, { mode: 0o600 })
   } catch (error) {
     await logger.warn(`[PluginVault] Failed to rotate encrypted vault ${id}`, error)
@@ -299,7 +300,7 @@ async function readVaultUnlocked(id: string, signal?: AbortSignal): Promise<Vaul
     if (mode === 'persistent-sync' && signal?.aborted) return { kind: 'unavailable' }
     const { result, shouldReEncrypt } =
       mode === 'persistent-async'
-        ? await safeStorage.decryptStringAsync(encrypted)
+        ? await asyncStorage.decryptStringAsync!(encrypted)
         : { result: safeStorage.decryptString(encrypted), shouldReEncrypt: false }
     const parsed = parseVault(JSON.parse(result))
     if (!parsed) return { kind: 'invalid' }

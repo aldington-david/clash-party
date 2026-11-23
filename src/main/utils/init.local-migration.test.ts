@@ -27,6 +27,12 @@ vi.mock('electron', () => ({
 
 vi.mock('@electron-toolkit/utils', () => ({ is: { dev: false } }))
 
+vi.mock('../window', () => ({ mainWindow: null }))
+vi.mock('./dirs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./dirs')>()),
+  resourcesFilesDir: () => path.join(process.cwd(), 'resources', 'themes')
+}))
+
 vi.mock('sysproxy-rs', () => ({
   triggerAutoProxy: vi.fn(),
   triggerManualProxy: vi.fn()

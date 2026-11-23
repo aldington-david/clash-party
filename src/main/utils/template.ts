@@ -26,10 +26,10 @@ export const defaultConfig: IAppConfig = {
   enableSmartOverride: true,
   smartCoreUseLightGBM: false,
   smartCoreCollectData: false,
-  silentStart: false,
+  silentStart: true,
   appTheme: 'system',
   useWindowFrame: false,
-  proxyInTray: true,
+  proxyInTray: false,
   showCurrentProxyInTray: false,
   enableTrafficLogger: DEFAULT_ENABLE_TRAFFIC_LOGGER,
   trayProxyGroupStyle: 'default',
@@ -48,12 +48,12 @@ export const defaultConfig: IAppConfig = {
   autoQuitWithoutCore: false,
   autoQuitWithoutCoreDelay: 60,
   autoQuitWithoutCoreMode: 'core',
-  proxyDisplayMode: 'simple',
+  proxyDisplayMode: 'full',
   proxyDisplayOrder: 'default',
   autoCheckUpdate: true,
   autoUpdateProfileOnStart: true,
   silentUpdate: true,
-  autoCloseConnection: true,
+  autoCloseConnection: false,
   autoCloseConnectionOnlyGroup: false,
   subscriptionTimeout: 30000,
   yamlMaxAliasCount: DEFAULT_YAML_MAX_ALIAS_COUNT,
@@ -73,7 +73,7 @@ export const defaultConfig: IAppConfig = {
   siderOrder: DEFAULT_SIDER_ORDER,
   lastSelectedSiderCard: 'proxy',
   siderWidth: 250,
-  sysProxy: { enable: false, mode: 'manual' },
+  sysProxy: { enable: false, mode: 'auto' },
   triggerMainWindowBehavior: 'show',
   showMixedPort: DEFAULT_MIHOMO_PORTS.mixed,
   enableMixedPort: true,
@@ -88,7 +88,12 @@ export const defaultConfig: IAppConfig = {
   testProfileOnStart: true,
   coreStartupMode: 'log',
   useHotReloadProfile: false,
-  hotReloadProfileAutoCloseConnection: false
+  hotReloadProfileAutoCloseConnection: false,
+  profileDisplayDate: 'update',
+  dnsCardStatus: 'hidden',
+  sniffCardStatus: 'hidden',
+  mihomoCpuPriority: 'PRIORITY_ABOVE_NORMAL',
+  customTheme: 'homohub.css'
 }
 
 export const defaultControledMihomoConfig: Partial<IMihomoConfig> = {
@@ -104,8 +109,8 @@ export const defaultControledMihomoConfig: Partial<IMihomoConfig> = {
   'tproxy-port': DEFAULT_MIHOMO_PORTS.tproxy,
   'allow-lan': false,
   'unified-delay': true,
-  'tcp-concurrent': false,
-  'log-level': 'info',
+  'tcp-concurrent': true,
+  'log-level': 'silent',
   'find-process-mode': 'strict',
   'bind-address': '*',
   'lan-allowed-ips': DEFAULT_MIHOMO_LAN_ALLOWED_IPS,
@@ -122,7 +127,7 @@ export const defaultControledMihomoConfig: Partial<IMihomoConfig> = {
     'store-selected': true,
     'store-fake-ip': true
   },
-  'geo-auto-update': false,
+  'geo-auto-update': true,
   'geo-update-interval': 24,
   // Smart 内核自带的 LightGBM 模型更新器，默认值与内核一致（关闭 / 72 小时 /
   // 空地址即用内核内置地址）。非 Smart 内核会忽略这几个键。

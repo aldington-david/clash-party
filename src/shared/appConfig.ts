@@ -1,6 +1,6 @@
 export const DEFAULT_CONTROL_DNS = false
 
-export const DEFAULT_CONTROL_SNIFF = true
+export const DEFAULT_CONTROL_SNIFF = false
 
 export const DEFAULT_USE_NAMESERVER_POLICY = false
 
@@ -8,7 +8,7 @@ export const DEFAULT_NAMESERVER_POLICY: IAppConfig['nameserverPolicy'] = {}
 
 export const DEFAULT_ENABLE_TRAFFIC_LOGGER = true
 
-export const DEFAULT_USE_SUB_STORE = true
+export const DEFAULT_USE_SUB_STORE = false
 
 export const DEFAULT_YAML_MAX_ALIAS_COUNT = 100
 
@@ -59,6 +59,7 @@ export function getDefaultMihomoTunDevice(platform: NodeJS.Platform | string): s
 type DefaultMihomoTunConfig = {
   enable: boolean
   stack: TunStack
+  'strict-route': boolean
   'auto-route': boolean
   'auto-redirect': boolean
   'auto-detect-interface': boolean
@@ -69,7 +70,8 @@ type DefaultMihomoTunConfig = {
 
 export const DEFAULT_MIHOMO_TUN_CONFIG: DefaultMihomoTunConfig = {
   enable: false,
-  stack: 'mixed',
+  stack: 'mips',
+  'strict-route': true,
   'auto-route': true,
   'auto-redirect': false,
   'auto-detect-interface': true,

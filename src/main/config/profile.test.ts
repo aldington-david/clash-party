@@ -768,3 +768,72 @@ describe('plugin subscription validation follow-ups (V7 regressions)', () => {
     })
   })
 })
+
+describe('new remote subscription schedule defaults', () => {
+  it('uses six hours even when the first response recommends another interval', async () => {
+    mocks.axiosGet.mockResolvedValue({
+      status: 200,
+      data: newProfile,
+      headers: { 'profile-update-interval': '24' }
+    })
+    const item = await createProfile({ type: 'remote', url: 'https://example.test/subscription' })
+    expect(item).toMatchObject({ autoUpdate: true, interval: 360, allowFixedInterval: true })
+  })
+
+  it('uses six hours without a response interval', async () => {
+    const item = await createProfile({ type: 'remote', url: 'https://example.test/subscription' })
+    expect(item).toMatchObject({ autoUpdate: true, interval: 360, allowFixedInterval: true })
+  })
+
+  it('retains an explicit disabled switch and fixed interval', async () => {
+    mocks.axiosGet.mockResolvedValue({
+      status: 200,
+      data: newProfile,
+      headers: { 'profile-update-interval': '24' }
+    })
+    const item = await createProfile({
+      type: 'remote',
+      url: 'https://example.test/subscription',
+      autoUpdate: false,
+      interval: 90,
+      allowFixedInterval: true
+    })
+    expect(item).toMatchObject({ autoUpdate: false, interval: 90, allowFixedInterval: true })
+  })
+
+  it('retains the explicit choice to follow the response interval', async () => {
+    mocks.axiosGet.mockResolvedValue({
+      status: 200,
+      data: newProfile,
+      headers: { 'profile-update-interval': '12' }
+    })
+    const item = await createProfile({
+      id: 'remote',
+      type: 'remote',
+      url: 'https://example.test/subscription',
+      autoUpdate: false,
+      interval: 60,
+      allowFixedInterval: false
+    })
+    expect(item).toMatchObject({ autoUpdate: false, interval: 720, allowFixedInterval: false })
+  })
+
+  it('retains zero or missing intervals on existing subscriptions and local files', async () => {
+    const item = await createProfile({
+      id: 'remote',
+      type: 'remote',
+      url: 'https://example.test/subscription',
+      interval: 0,
+      autoUpdate: false
+    })
+    expect(item).toMatchObject({ interval: 0, autoUpdate: false, allowFixedInterval: false })
+    const legacy = await createProfile({
+      id: 'remote',
+      type: 'remote',
+      url: 'https://example.test/subscription'
+    })
+    expect(legacy.interval).toBe(0)
+    const local = await createProfile({ type: 'local', file: newProfile })
+    expect(local).toMatchObject({ interval: 0, allowFixedInterval: false })
+  })
+})
